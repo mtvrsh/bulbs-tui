@@ -1,54 +1,60 @@
+use clap::Parser;
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEventKind},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    event::{Event, KeyCode, KeyEventKind},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     Terminal,
 };
-use std::{
-    error::Error,
-    io::{self, stdout},
-};
+use std::{error::Error, io, path::PathBuf};
 
 mod api;
 mod app;
 mod rgb;
 mod ui;
 use crate::app::{App, CurrentWidget, CurrentlyAdding};
-use crate::ui::ui;
+
+#[derive(Parser)]
+#[command(about, version)]
+struct Cli {
+    /// Path to config file
+    #[arg(short, long, value_name = "PATH")]
+    config: Option<PathBuf>,
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
-    enable_raw_mode()?;
-    execute!(stdout(), EnterAlternateScreen)?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
+    let cfg_path = Cli::parse().config;
 
-    let mut app = App::new();
+    crossterm::terminal::enable_raw_mode()?;
+    crossterm::execute!(io::stdout(), EnterAlternateScreen)?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
+
+    let mut app = App::new(cfg_path);
     let res = run_app(&mut terminal, &mut app);
 
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen,)?;
+    crossterm::terminal::disable_raw_mode()?;
+    crossterm::execute!(terminal.backend_mut(), LeaveAlternateScreen,)?;
     terminal.show_cursor()?;
 
     match res {
         Ok(()) => {}
         Err(e) => eprintln!("{e}"),
     }
-
     Ok(())
 }
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<()> {
     loop {
-        terminal.draw(|f| ui(f, app))?;
+        terminal.draw(|f| ui::ui(f, app))?;
 
-        if let Event::Key(key) = event::read()? {
+        if let Event::Key(key) = crossterm::event::read()? {
             if key.kind == KeyEventKind::Release {
                 continue;
             }
             match app.current_widget {
                 CurrentWidget::Devices => match key.code {
+                    KeyCode::Esc | KeyCode::Char('q') => return Ok(()),
                     KeyCode::Tab | KeyCode::Left | KeyCode::Right | KeyCode::Char('h' | 'l') => {
                         app.current_widget = CurrentWidget::Logs;
                     }
@@ -59,23 +65,25 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                         app.currently_adding = Some(CurrentlyAdding::IP);
                     }
                     KeyCode::Char('A') => app.discover(),
+                    KeyCode::Char('b') => todo!(),
                     KeyCode::Char('c') => {
-                        if !app.bulbs.devices.is_empty() {
+                        if !app.devices.bulbs.is_empty() {
                             app.current_widget = CurrentWidget::PickColor;
                         }
                     }
                     KeyCode::Char('d') => app.remove_device(),
                     KeyCode::Char('e') => app.toggle_selected(),
-                    KeyCode::Esc | KeyCode::Char('q') => return Ok(()),
+                    KeyCode::Char('r') => app.load_config(),
+                    KeyCode::Char('s') => app.save_config(),
                     KeyCode::Char(' ') => app.select_device(),
                     _ => {}
                 },
                 CurrentWidget::Logs => match key.code {
+                    KeyCode::Esc | KeyCode::Char('q') => return Ok(()),
                     KeyCode::Backspace => app.logs.clear(),
                     KeyCode::Tab | KeyCode::Left | KeyCode::Right | KeyCode::Char('h' | 'l') => {
                         app.current_widget = CurrentWidget::Devices;
                     }
-                    KeyCode::Esc | KeyCode::Char('q') => return Ok(()),
                     _ => {}
                 },
                 CurrentWidget::AddDevice => match key.code {

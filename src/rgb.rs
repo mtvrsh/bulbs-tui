@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Rgb {
@@ -14,8 +13,8 @@ impl Rgb {
     }
 }
 
-impl fmt::Display for Rgb {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl std::fmt::Display for Rgb {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "#{:02X}{:02X}{:02X}", self.r, self.g, self.b,)
     }
 }

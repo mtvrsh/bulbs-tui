@@ -1,23 +1,26 @@
 use serde::{Deserialize, Serialize};
-use std::fmt;
 use ureq::{Agent, Error};
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Bulb {
-    pub brightness: f32,
+    pub brightness: f32, // range: 0..1
     pub color: String,
     #[serde(alias = "on")]
-    pub enabled: u8,
+    pub enabled: u8, // api uses int instead of bool
+}
 
-    #[serde(skip)]
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct Device {
+    #[serde(flatten)]
+    pub bulb: Bulb,
     pub ip: String,
-    #[serde(skip)]
+    #[serde(default)]
     pub name: String,
-    #[serde(skip)]
+    #[serde(skip_serializing, default = "tt")]
     pub selected: bool,
 }
 
-impl Bulb {
+impl Device {
     pub fn new(ip: String, name: String) -> Self {
         Self {
             ip,
@@ -28,13 +31,11 @@ impl Bulb {
     }
 
     pub fn update(&mut self, agent: &Agent) -> Result<(), Error> {
-        let b: Self = agent
+        let b: Bulb = agent
             .get(format!("http://{}/led", self.ip).as_str())
             .call()?
             .into_json()?;
-        self.brightness = b.brightness;
-        self.color = b.color;
-        self.enabled = b.enabled;
+        self.bulb = b;
         Ok(())
     }
 
@@ -42,7 +43,7 @@ impl Bulb {
         agent
             .get(format!("http://{}/led/on", self.ip).as_str())
             .call()?;
-        self.enabled = 1;
+        self.bulb.enabled = 1;
         Ok(())
     }
 
@@ -50,13 +51,13 @@ impl Bulb {
         agent
             .get(format!("http://{}/led/off", self.ip).as_str())
             .call()?;
-        self.enabled = 0;
+        self.bulb.enabled = 0;
         Ok(())
     }
 
     pub fn toggle(&mut self, agent: &Agent) -> Result<(), Error> {
         self.update(agent)?;
-        if self.enabled == 1 {
+        if self.bulb.enabled == 1 {
             self.off(agent)
         } else {
             self.on(agent)
@@ -67,7 +68,7 @@ impl Bulb {
         agent
             .put(format!("http://{}/led/color/{}", self.ip, color).as_str())
             .call()?;
-        self.color = color.clone();
+        self.bulb.color = color.clone();
         Ok(())
     }
 
@@ -75,52 +76,53 @@ impl Bulb {
         agent
             .put(format!("http://{}/led/brightness/{}", self.ip, brightness).as_str())
             .call()?;
-        self.brightness = brightness;
+        self.bulb.brightness = brightness;
         Ok(())
     }
 }
 
-impl fmt::Display for Bulb {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl std::fmt::Display for Device {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
             "{} {}  {}  {}  {}",
             if self.selected { ">" } else { " " },
             self.ip,
-            if self.enabled == 1 { "ON" } else { "OFF" },
-            self.color,
+            if self.bulb.enabled == 1 { "ON" } else { "OFF" },
+            self.bulb.color,
             self.name,
         )
     }
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
-pub struct Bulbs {
-    pub devices: Vec<Bulb>,
+pub struct Devices {
+    #[serde(rename = "bulb")]
+    pub bulbs: Vec<Device>,
 }
 
-impl Bulbs {
+impl Devices {
     pub fn status(&mut self, agent: &Agent) -> Result<(), Error> {
-        for i in 0..self.devices.len() {
-            if self.devices[i].selected {
-                self.devices[i].update(agent)?;
+        for i in 0..self.bulbs.len() {
+            if self.bulbs[i].selected {
+                self.bulbs[i].update(agent)?;
             }
         }
         Ok(())
     }
 
     pub fn on(&mut self, agent: &Agent) -> Result<(), Error> {
-        for i in 0..self.devices.len() {
-            if self.devices[i].selected {
-                self.devices[i].on(agent)?;
+        for i in 0..self.bulbs.len() {
+            if self.bulbs[i].selected {
+                self.bulbs[i].on(agent)?;
             }
         }
         Ok(())
     }
     pub fn off(&mut self, agent: &Agent) -> Result<(), Error> {
-        for i in 0..self.devices.len() {
-            if self.devices[i].selected {
-                self.devices[i].off(agent)?;
+        for i in 0..self.bulbs.len() {
+            if self.bulbs[i].selected {
+                self.bulbs[i].off(agent)?;
             }
         }
         Ok(())
@@ -128,18 +130,18 @@ impl Bulbs {
 
     pub fn toggle(&mut self, agent: &Agent) -> Result<(), Error> {
         let mut first = 0;
-        for i in 0..self.devices.len() {
-            if self.devices[i].selected {
-                first = self.devices[i].enabled;
+        for i in 0..self.bulbs.len() {
+            if self.bulbs[i].selected {
+                first = self.bulbs[i].bulb.enabled;
                 break;
             }
         }
-        for i in 0..self.devices.len() {
-            if self.devices[i].selected {
+        for i in 0..self.bulbs.len() {
+            if self.bulbs[i].selected {
                 if first == 1 {
-                    self.devices[i].off(agent)?;
+                    self.bulbs[i].off(agent)?;
                 } else {
-                    self.devices[i].on(agent)?;
+                    self.bulbs[i].on(agent)?;
                 }
             }
         }
@@ -147,20 +149,24 @@ impl Bulbs {
     }
 
     pub fn set_color(&mut self, agent: &Agent, color: String) -> Result<(), Error> {
-        for i in 0..self.devices.len() {
-            if self.devices[i].selected {
-                self.devices[i].set_color(agent, &color)?;
+        for i in 0..self.bulbs.len() {
+            if self.bulbs[i].selected {
+                self.bulbs[i].set_color(agent, &color)?;
             }
         }
         Ok(())
     }
 
     pub fn set_brightness(&mut self, agent: &Agent, brightness: f32) -> Result<(), Error> {
-        for i in 0..self.devices.len() {
-            if self.devices[i].selected {
-                self.devices[i].set_brightness(agent, brightness)?;
+        for i in 0..self.bulbs.len() {
+            if self.bulbs[i].selected {
+                self.bulbs[i].set_brightness(agent, brightness)?;
             }
         }
         Ok(())
     }
+}
+
+const fn tt() -> bool {
+    true
 }

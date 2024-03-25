@@ -1,7 +1,7 @@
-use std::time::Duration;
+use std::{fs, path::PathBuf, time::Duration};
 use ureq::{Agent, AgentBuilder};
 
-use crate::api::{Bulb, Bulbs};
+use crate::api::{Device, Devices};
 
 pub enum CurrentWidget {
     Devices,
@@ -17,8 +17,9 @@ pub enum CurrentlyAdding {
 
 pub struct App {
     pub agent: Agent,
-    pub bulbs: Bulbs,
+    pub devices: Devices,
     pub logs: Vec<String>,
+    config_path: PathBuf,
 
     pub current_device_index: usize,
     pub current_widget: CurrentWidget,
@@ -36,14 +37,16 @@ macro_rules! log {
 }
 
 impl App {
-    pub fn new() -> Self {
-        Self {
+    pub fn new(config_path: Option<PathBuf>) -> Self {
+        let path = config_path.unwrap_or_else(xdg_cfg_path);
+        let mut app: Self = Self {
             agent: AgentBuilder::new()
                 .timeout_connect(Duration::from_secs(1))
                 .timeout(Duration::from_secs(1))
                 .build(),
-            bulbs: Bulbs::default(),
+            devices: Devices::default(),
             logs: Vec::default(),
+            config_path: path,
 
             current_device_index: 0,
             current_widget: CurrentWidget::Devices,
@@ -52,7 +55,9 @@ impl App {
             color_input: String::new(),
             ip_input: String::new(),
             name_input: String::new(),
-        }
+        };
+        app.load_config();
+        app
     }
 
     pub fn toggle_adding_field(&mut self) {
@@ -66,8 +71,32 @@ impl App {
         }
     }
 
-    fn current_device(&mut self) -> &mut Bulb {
-        &mut self.bulbs.devices[self.current_device_index]
+    pub fn load_config(&mut self) {
+        if let Ok(v) = fs::read_to_string(self.config_path.as_path()) {
+            let ds: Devices = match toml::from_str(v.as_str()) {
+                Ok(v) => v,
+                Err(e) => {
+                    log!(self, format!("failed to parse config file: {e}"));
+                    return;
+                }
+            };
+            self.devices = ds;
+        };
+    }
+
+    pub fn save_config(&mut self) {
+        match toml::to_string(&self.devices) {
+            Ok(v) => {
+                if let Err(e) = fs::write(self.config_path.as_path(), v) {
+                    log!(self, format!("failed to save config file: {e}"));
+                }
+            }
+            Err(e) => log!(self, format!("failed to deserialize config file: {e}")),
+        }
+    }
+
+    fn current_device(&mut self) -> &mut Device {
+        &mut self.devices.bulbs[self.current_device_index]
     }
 
     pub fn prev_device(&mut self) {
@@ -75,24 +104,24 @@ impl App {
     }
 
     pub fn next_device(&mut self) {
-        if self.current_device_index < self.bulbs.devices.len().saturating_sub(1) {
+        if self.current_device_index < self.devices.bulbs.len().saturating_sub(1) {
             self.current_device_index = self.current_device_index.saturating_add(1);
         }
     }
 
     pub fn select_device(&mut self) {
-        if !self.bulbs.devices.is_empty() {
+        if !self.devices.bulbs.is_empty() {
             self.current_device().selected = !self.current_device().selected;
         }
     }
 
     pub fn remove_device(&mut self) {
-        self.bulbs.devices.remove(self.current_device_index);
+        self.devices.bulbs.remove(self.current_device_index);
         self.prev_device();
     }
 
     pub fn add_device(&mut self) {
-        if self.bulbs.devices.iter().any(|x| x.ip == self.ip_input) {
+        if self.devices.bulbs.iter().any(|x| x.ip == self.ip_input) {
             log!(
                 self,
                 format!("device \"{}\" already present on list", self.ip_input)
@@ -100,7 +129,7 @@ impl App {
             return;
         }
         if !self.ip_input.is_empty() {
-            let mut bulb = Bulb::new(self.ip_input.clone(), self.name_input.clone());
+            let mut bulb = Device::new(self.ip_input.clone(), self.name_input.clone());
             if let Err(e) = bulb.update(&self.agent) {
                 log!(self, e.to_string());
                 return;
@@ -109,7 +138,7 @@ impl App {
                 log!(self, e.to_string());
                 return;
             }
-            self.bulbs.devices.push(bulb);
+            self.devices.bulbs.push(bulb);
             self.ip_input.clear();
             self.name_input.clear();
         }
@@ -122,16 +151,26 @@ impl App {
     }
 
     pub fn toggle_selected(&mut self) {
-        if let Err(e) = self.bulbs.toggle(&self.agent) {
+        if let Err(e) = self.devices.toggle(&self.agent) {
             log!(self, e.to_string());
         }
     }
 
     pub fn set_color(&mut self) {
-        if let Err(e) = self.bulbs.set_color(&self.agent, self.color_input.clone()) {
+        if let Err(e) = self
+            .devices
+            .set_color(&self.agent, self.color_input.clone())
+        {
             log!(self, e.to_string());
         }
         self.color_input.clear();
         self.current_widget = CurrentWidget::Devices;
     }
+}
+
+fn xdg_cfg_path() -> PathBuf {
+    let xdg_dirs = xdg::BaseDirectories::with_prefix("bulbs").expect("failed to get XDG dirs");
+    xdg_dirs
+        .place_config_file("tui.toml")
+        .expect("failed to setup XDG CONFIG dir")
 }

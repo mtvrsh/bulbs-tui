@@ -7,11 +7,12 @@ use ratatui::{
 use crate::app::{App, CurrentWidget, CurrentlyAdding};
 
 pub fn ui(f: &mut Frame, app: &App) {
+    #[allow(clippy::cast_possible_truncation)]
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(1),
-            Constraint::Min(app.bulbs.devices.len() as u16 + 2),
+            Constraint::Min(app.devices.bulbs.len() as u16 + 2),
             Constraint::Length(app.logs.len() as u16 + 2),
         ])
         .split(f.size());
@@ -28,9 +29,9 @@ pub fn ui(f: &mut Frame, app: &App) {
 
     let mut list_items = Vec::<ListItem>::new();
 
-    for (i, dev) in app.bulbs.devices.iter().enumerate() {
+    for (i, dev) in app.devices.bulbs.iter().enumerate() {
         let mut style = Style::default().bold();
-        if dev.enabled == 1 {
+        if dev.bulb.enabled == 1 {
             style = style.blue();
         } else {
             style = style.dark_gray();
@@ -68,7 +69,7 @@ pub fn ui(f: &mut Frame, app: &App) {
         .iter()
         .take(chunks[2].height as usize - 2)
         .rev()
-        .cloned()
+        .map(|l| l.replace('\n', " "))
         .collect();
     let logs = Paragraph::new(ll.join("\n"))
         .block(log_block.title("Logs").title_bottom(help))

@@ -12,7 +12,10 @@ pedantic = "warn"
 unwrap_used = "warn"
 
 [dependencies]
+clap = { version = "4.5.3", features = ["derive"] }
 crossterm = "0.27.0"
 ratatui = "0.26.1"
 serde = { version = "1.0.196", features = ["derive"] }
-ureq = { version = "2.9.6", default-features = false, features = ["json"] }
+toml = "0.8.12"
+ureq = { version = "2.9.6", features = ["json"] }
+xdg = "2.5.2"
