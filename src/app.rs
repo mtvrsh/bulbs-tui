@@ -188,6 +188,12 @@ impl App {
         }
     }
 
+    pub fn toggle_current(&mut self) {
+        if let Err(e) = self.devices.bulbs[self.current_device_index].toggle(&self.agent) {
+            log!(self, e.to_string());
+        }
+    }
+
     pub fn set_color_brightness(&mut self) {
         if !self.color_input.is_empty() {
             if let Err(e) = self

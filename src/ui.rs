@@ -171,8 +171,12 @@ fn render_color_picker(f: &mut Frame, app: &App) {
         let brightness_text = Paragraph::new(app.brightness_input.clone()).block(brightness_block);
         f.render_widget(brightness_text, popup_chunks[1]);
 
-        let color_preview: Color = app.color_input.parse().unwrap_or(Color::Blue);
-        f.render_widget(Block::new().bg(color_preview), color_indicator_chunk);
+        let color = if app.color_input.len() == 7 {
+            app.color_input.parse().unwrap_or_default()
+        } else {
+            Color::Blue
+        };
+        f.render_widget(Block::new().bg(color), color_indicator_chunk);
     }
 }
 

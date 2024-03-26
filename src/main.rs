@@ -12,7 +12,6 @@ use std::{error::Error, io, path::PathBuf};
 
 mod api;
 mod app;
-mod rgb;
 mod ui;
 use crate::app::{App, CurrentWidget, CurrentlyAdding};
 
@@ -57,6 +56,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
             match app.current_widget {
                 CurrentWidget::Devices => match key.code {
                     KeyCode::Esc | KeyCode::Char('q') => return Ok(()),
+                    KeyCode::Enter => app.toggle_current(),
                     KeyCode::Tab | KeyCode::Left | KeyCode::Right | KeyCode::Char('h' | 'l') => {
                         app.current_widget = CurrentWidget::Logs;
                     }
