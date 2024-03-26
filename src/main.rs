@@ -1,3 +1,4 @@
+use app::CurrentlySetting;
 use clap::Parser;
 use crossterm::{
     event::{Event, KeyCode, KeyEventKind},
@@ -31,6 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let mut app = App::new(cfg_path);
+    app.load_config();
     let res = run_app(&mut terminal, &mut app);
 
     crossterm::terminal::disable_raw_mode()?;
@@ -65,12 +67,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                         app.currently_adding = Some(CurrentlyAdding::IP);
                     }
                     KeyCode::Char('A') => app.discover(),
-                    KeyCode::Char('b') => todo!(),
-                    KeyCode::Char('c') => {
-                        if !app.devices.bulbs.is_empty() {
-                            app.current_widget = CurrentWidget::PickColor;
-                        }
-                    }
+                    KeyCode::Char('c') => app.open_settings(),
                     KeyCode::Char('d') => app.remove_device(),
                     KeyCode::Char('e') => app.toggle_selected(),
                     KeyCode::Char('r') => app.load_config(),
@@ -91,16 +88,16 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                     KeyCode::Backspace => {
                         if let Some(editing) = &app.currently_adding {
                             match editing {
-                                CurrentlyAdding::IP => _ = app.ip_input.pop(),
-                                CurrentlyAdding::Name => _ = app.name_input.pop(),
-                            }
+                                CurrentlyAdding::IP => app.ip_input.pop(),
+                                CurrentlyAdding::Name => app.name_input.pop(),
+                            };
                         }
                     }
                     KeyCode::Esc => {
                         app.current_widget = CurrentWidget::Devices;
                         app.currently_adding = None;
                     }
-                    KeyCode::Tab => app.toggle_adding_field(),
+                    KeyCode::Tab => app.toggle_curr_adding_field(),
                     KeyCode::Char(c) => {
                         if let Some(editing) = &app.currently_adding {
                             match editing {
@@ -111,11 +108,29 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                     }
                     _ => {}
                 },
-                CurrentWidget::PickColor => match key.code {
-                    KeyCode::Enter => app.set_color(),
-                    KeyCode::Backspace => _ = app.color_input.pop(),
-                    KeyCode::Esc => app.current_widget = CurrentWidget::Devices,
-                    KeyCode::Char(c) => app.color_input.push(c),
+                CurrentWidget::DeviceSettings => match key.code {
+                    KeyCode::Enter => app.set_color_brightness(),
+                    KeyCode::Backspace => {
+                        if let Some(setting) = &app.currently_setting {
+                            match setting {
+                                CurrentlySetting::Color => app.color_input.pop(),
+                                CurrentlySetting::Brightness => app.brightness_input.pop(),
+                            };
+                        }
+                    }
+                    KeyCode::Esc => {
+                        app.current_widget = CurrentWidget::Devices;
+                        app.currently_setting = None;
+                    }
+                    KeyCode::Tab => app.toggle_curr_setting_field(),
+                    KeyCode::Char(c) => {
+                        if let Some(setting) = &app.currently_setting {
+                            match setting {
+                                CurrentlySetting::Color => app.color_input.push(c),
+                                CurrentlySetting::Brightness => app.brightness_input.push(c),
+                            }
+                        }
+                    }
                     _ => {}
                 },
             }

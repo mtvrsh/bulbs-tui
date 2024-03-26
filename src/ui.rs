@@ -4,7 +4,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::{App, CurrentWidget, CurrentlyAdding};
+use crate::app::{App, CurrentWidget, CurrentlyAdding, CurrentlySetting};
 
 pub fn ui(f: &mut Frame, app: &App) {
     #[allow(clippy::cast_possible_truncation)]
@@ -24,7 +24,7 @@ pub fn ui(f: &mut Frame, app: &App) {
             devices_block = devices_block.border_style(Style::new().light_blue());
         }
         CurrentWidget::Logs => log_block = log_block.border_style(Style::new().light_blue()),
-        CurrentWidget::PickColor | CurrentWidget::AddDevice => (),
+        CurrentWidget::DeviceSettings | CurrentWidget::AddDevice => (),
     }
 
     let mut list_items = Vec::<ListItem>::new();
@@ -82,7 +82,7 @@ pub fn ui(f: &mut Frame, app: &App) {
 
     match &app.current_widget {
         CurrentWidget::Devices | CurrentWidget::Logs => (),
-        CurrentWidget::PickColor => render_color_picker(f, app),
+        CurrentWidget::DeviceSettings => render_color_picker(f, app),
         CurrentWidget::AddDevice => render_device_adding(f, app),
     }
 }
@@ -126,31 +126,41 @@ fn render_device_adding(f: &mut Frame, app: &App) {
 }
 
 fn render_color_picker(f: &mut Frame, app: &App) {
-    let popup_block = Block::default()
-        .title("Set color")
-        .title_alignment(Alignment::Center)
-        .borders(Borders::NONE)
-        .bg(Color::Reset)
-        .style(Style::default());
+    if let Some(setting) = &app.currently_setting {
+        let popup_block = Block::default()
+            .title("Device settings")
+            .title_alignment(Alignment::Center)
+            .borders(Borders::NONE)
+            .bg(Color::Reset)
+            .style(Style::default());
 
-    let area = centered_rect(50, 50, f.size());
-    f.render_widget(popup_block, area);
+        let area = centered_rect(50, 50, f.size());
+        f.render_widget(popup_block, area);
 
-    let popup_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(1)
-        .constraints([Constraint::Length(3)])
-        .split(area);
+        let popup_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(1)
+            .constraints([Constraint::Length(3), Constraint::Length(3)])
+            .split(area);
 
-    let block = Block::default()
-        .bg(Color::Blue)
-        .fg(Color::Black)
-        .title("#hex")
-        .borders(Borders::ALL);
+        let mut ip_block = Block::default().title("Color").borders(Borders::ALL);
+        let mut name_block = Block::default().title("Brightness").borders(Borders::ALL);
 
-    let color_text = Paragraph::new(app.color_input.clone()).block(block);
-    f.render_widget(Clear, popup_chunks[0]);
-    f.render_widget(color_text, popup_chunks[0]);
+        let active_style = Style::default().bg(Color::Blue).fg(Color::Black);
+
+        match setting {
+            CurrentlySetting::Color => ip_block = ip_block.style(active_style),
+            CurrentlySetting::Brightness => name_block = name_block.style(active_style),
+        };
+
+        f.render_widget(Clear, area);
+
+        let color_text = Paragraph::new(app.color_input.clone()).block(ip_block);
+        f.render_widget(color_text, popup_chunks[0]);
+
+        let brightness_text = Paragraph::new(app.brightness_input.clone()).block(name_block);
+        f.render_widget(brightness_text, popup_chunks[1]);
+    }
 }
 
 /// helper function to create a centered rect using up certain percentage of the available rect `r`

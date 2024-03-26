@@ -7,12 +7,17 @@ pub enum CurrentWidget {
     Devices,
     Logs,
     AddDevice,
-    PickColor,
+    DeviceSettings,
 }
 
 pub enum CurrentlyAdding {
     IP,
     Name,
+}
+
+pub enum CurrentlySetting {
+    Color,
+    Brightness,
 }
 
 pub struct App {
@@ -24,8 +29,10 @@ pub struct App {
     pub current_device_index: usize,
     pub current_widget: CurrentWidget,
     pub currently_adding: Option<CurrentlyAdding>,
+    pub currently_setting: Option<CurrentlySetting>,
 
     pub color_input: String,
+    pub brightness_input: String,
     pub ip_input: String,
     pub name_input: String,
 }
@@ -39,7 +46,7 @@ macro_rules! log {
 impl App {
     pub fn new(config_path: Option<PathBuf>) -> Self {
         let path = config_path.unwrap_or_else(xdg_cfg_path);
-        let mut app: Self = Self {
+        Self {
             agent: AgentBuilder::new()
                 .timeout_connect(Duration::from_secs(1))
                 .timeout(Duration::from_secs(1))
@@ -51,16 +58,16 @@ impl App {
             current_device_index: 0,
             current_widget: CurrentWidget::Devices,
             currently_adding: None,
+            currently_setting: None,
 
             color_input: String::new(),
+            brightness_input: String::new(),
             ip_input: String::new(),
             name_input: String::new(),
-        };
-        app.load_config();
-        app
+        }
     }
 
-    pub fn toggle_adding_field(&mut self) {
+    pub fn toggle_curr_adding_field(&mut self) {
         if let Some(edit_mode) = &self.currently_adding {
             match edit_mode {
                 CurrentlyAdding::IP => self.currently_adding = Some(CurrentlyAdding::Name),
@@ -68,6 +75,31 @@ impl App {
             };
         } else {
             self.currently_adding = Some(CurrentlyAdding::IP);
+        }
+    }
+
+    pub fn toggle_curr_setting_field(&mut self) {
+        if let Some(edit_mode) = &self.currently_setting {
+            match edit_mode {
+                CurrentlySetting::Color => {
+                    self.currently_setting = Some(CurrentlySetting::Brightness);
+                }
+
+                CurrentlySetting::Brightness => {
+                    self.currently_setting = Some(CurrentlySetting::Color);
+                }
+            };
+        } else {
+            self.currently_setting = Some(CurrentlySetting::Color);
+        }
+    }
+
+    pub fn open_settings(&mut self) {
+        self.color_input = self.current_device().bulb.color.clone();
+        self.brightness_input = self.current_device().bulb.brightness.to_string();
+        if !self.devices.bulbs.is_empty() {
+            self.current_widget = CurrentWidget::DeviceSettings;
+            self.currently_setting = Some(CurrentlySetting::Color);
         }
     }
 
@@ -156,14 +188,36 @@ impl App {
         }
     }
 
-    pub fn set_color(&mut self) {
-        if let Err(e) = self
-            .devices
-            .set_color(&self.agent, self.color_input.clone())
-        {
-            log!(self, e.to_string());
+    pub fn set_color_brightness(&mut self) {
+        if !self.color_input.is_empty() {
+            if let Err(e) = self
+                .devices
+                .set_color(&self.agent, self.color_input.clone())
+            {
+                log!(self, e.to_string());
+            }
+            self.color_input.clear();
         }
-        self.color_input.clear();
+
+        let brightness = self.brightness_input.parse::<f32>();
+        match brightness {
+            Err(e) => {
+                log!(self, e.to_string());
+                return;
+            }
+            Ok(v) => {
+                // compare floats with error margin, ty clippy
+                let error_margin = f32::EPSILON;
+                if (v - self.current_device().bulb.brightness).abs() > error_margin {
+                    if let Err(e) = self.devices.set_brightness(&self.agent, v) {
+                        log!(self, e.to_string());
+                    }
+                    self.brightness_input.clear();
+                }
+            }
+        }
+
+        self.currently_setting = None;
         self.current_widget = CurrentWidget::Devices;
     }
 }
