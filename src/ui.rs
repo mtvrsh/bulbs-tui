@@ -109,7 +109,6 @@ fn render_device_adding(f: &mut Frame, app: &App) {
         let mut name_block = Block::default().title("Name").borders(Borders::ALL);
 
         let active_style = Style::default().bg(Color::Blue).fg(Color::Black);
-
         match adding {
             CurrentlyAdding::IP => ip_block = ip_block.style(active_style),
             CurrentlyAdding::Name => name_block = name_block.style(active_style),
@@ -143,23 +142,33 @@ fn render_color_picker(f: &mut Frame, app: &App) {
             .constraints([Constraint::Length(3), Constraint::Length(3)])
             .split(area);
 
-        let mut ip_block = Block::default().title("Color").borders(Borders::ALL);
-        let mut name_block = Block::default().title("Brightness").borders(Borders::ALL);
+        let color_indicator_chunk = Layout::default()
+            .direction(Direction::Horizontal)
+            .margin(1)
+            .constraints([Constraint::Fill(1), Constraint::Length(6)])
+            .split(popup_chunks[0])[1];
+
+        let mut color_block = Block::default().title("Color").borders(Borders::ALL);
+        let mut brightness_block = Block::default().title("Brightness").borders(Borders::ALL);
 
         let active_style = Style::default().bg(Color::Blue).fg(Color::Black);
-
         match setting {
-            CurrentlySetting::Color => ip_block = ip_block.style(active_style),
-            CurrentlySetting::Brightness => name_block = name_block.style(active_style),
+            CurrentlySetting::Color => {
+                color_block = color_block.style(active_style);
+            }
+            CurrentlySetting::Brightness => brightness_block = brightness_block.style(active_style),
         };
 
         f.render_widget(Clear, area);
 
-        let color_text = Paragraph::new(app.color_input.clone()).block(ip_block);
+        let color_text = Paragraph::new(app.color_input.clone()).block(color_block);
         f.render_widget(color_text, popup_chunks[0]);
 
-        let brightness_text = Paragraph::new(app.brightness_input.clone()).block(name_block);
+        let brightness_text = Paragraph::new(app.brightness_input.clone()).block(brightness_block);
         f.render_widget(brightness_text, popup_chunks[1]);
+
+        let color_preview: Color = app.color_input.parse().unwrap_or(Color::Blue);
+        f.render_widget(Block::new().bg(color_preview), color_indicator_chunk);
     }
 }
 

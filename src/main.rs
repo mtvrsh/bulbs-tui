@@ -118,7 +118,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                             };
                         }
                     }
-                    KeyCode::Esc => {
+                    KeyCode::Esc | KeyCode::Char('q') => {
                         app.current_widget = CurrentWidget::Devices;
                         app.currently_setting = None;
                     }
@@ -126,8 +126,16 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                     KeyCode::Char(c) => {
                         if let Some(setting) = &app.currently_setting {
                             match setting {
-                                CurrentlySetting::Color => app.color_input.push(c),
-                                CurrentlySetting::Brightness => app.brightness_input.push(c),
+                                CurrentlySetting::Color => {
+                                    if app.color_input.len() < 7 {
+                                        app.color_input.push(c);
+                                    }
+                                }
+                                CurrentlySetting::Brightness => {
+                                    if app.brightness_input.len() < 7 {
+                                        app.brightness_input.push(c);
+                                    }
+                                }
                             }
                         }
                     }
