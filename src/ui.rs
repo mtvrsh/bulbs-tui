@@ -39,10 +39,16 @@ pub fn ui(f: &mut Frame, app: &App) {
         if app.current_device_index == i {
             style = style.on_light_blue();
         }
-        list_items.push(ListItem::new(Line::from(Span::styled(
-            dev.to_string(),
-            style,
-        ))));
+        let color = if dev.bulb.color.len() == 7 {
+            dev.bulb.color.parse().unwrap_or_default()
+        } else {
+            Color::Reset
+        };
+        list_items.push(ListItem::new(Line::from(vec![
+            Span::styled(dev.to_string(), style),
+            Span::styled("  ", style),
+            Span::styled("   ", style.bg(color)),
+        ])));
     }
 
     let devices = List::new(list_items).block(devices_block.title("Devices"));
@@ -153,9 +159,7 @@ fn render_color_picker(f: &mut Frame, app: &App) {
 
         let active_style = Style::default().bg(Color::Blue).fg(Color::Black);
         match setting {
-            CurrentlySetting::Color => {
-                color_block = color_block.style(active_style);
-            }
+            CurrentlySetting::Color => color_block = color_block.style(active_style),
             CurrentlySetting::Brightness => brightness_block = brightness_block.style(active_style),
         };
 

@@ -85,12 +85,12 @@ impl std::fmt::Display for Device {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "{} {}  {}  {}  {}",
+            "{} {:16} {:20} {:3} {:7}",
             if self.selected { ">" } else { " " },
             self.ip,
+            self.name,
             if self.bulb.enabled == 1 { "ON" } else { "OFF" },
             self.bulb.color,
-            self.name,
         )
     }
 }
