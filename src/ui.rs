@@ -39,11 +39,7 @@ pub fn ui(f: &mut Frame, app: &App) {
         if app.current_device_index == i {
             style = style.on_light_blue();
         }
-        let color = if dev.bulb.color.len() == 7 {
-            dev.bulb.color.parse().unwrap_or_default()
-        } else {
-            Color::Reset
-        };
+        let color: Color = dev.bulb.color.parse().unwrap_or(Color::LightBlue);
         list_items.push(ListItem::new(Line::from(vec![
             Span::styled(dev.to_string(), style),
             Span::styled("  ", style),
@@ -88,7 +84,7 @@ pub fn ui(f: &mut Frame, app: &App) {
 
     match &app.current_widget {
         CurrentWidget::Devices | CurrentWidget::Logs => (),
-        CurrentWidget::DeviceSettings => render_color_picker(f, app),
+        CurrentWidget::DeviceSettings => render_device_settings(f, app),
         CurrentWidget::AddDevice => render_device_adding(f, app),
     }
 }
@@ -125,7 +121,7 @@ fn render_device_adding(f: &mut Frame, app: &App) {
     }
 }
 
-fn render_color_picker(f: &mut Frame, app: &App) {
+fn render_device_settings(f: &mut Frame, app: &App) {
     if let Some(setting) = &app.currently_setting {
         let popup_block = Block::default().borders(Borders::NONE);
 
@@ -161,11 +157,7 @@ fn render_color_picker(f: &mut Frame, app: &App) {
         let brightness_text = Paragraph::new(app.brightness_input.clone()).block(brightness_block);
         f.render_widget(brightness_text, popup_chunks[1]);
 
-        let color = if app.color_input.len() == 7 {
-            app.color_input.parse().unwrap_or_default()
-        } else {
-            Color::Blue
-        };
+        let color: Color = app.color_input.parse().unwrap_or(Color::Blue);
         f.render_widget(Block::new().bg(color), color_indicator_chunk);
     }
 }

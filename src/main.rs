@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let mut app = App::new(cfg_path);
-    app.load_config()?;
+    app.load_config();
     let res = run_app(&mut terminal, &mut app);
 
     crossterm::terminal::disable_raw_mode()?;
@@ -70,7 +70,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<(), 
                     KeyCode::Char('c') => app.open_settings(),
                     KeyCode::Char('d') => app.remove_device(),
                     KeyCode::Char('e') => app.toggle_selected(),
-                    KeyCode::Char('s') => app.save_config(),
+                    KeyCode::Char('r') => app.update_devices(),
                     KeyCode::Char(' ') => app.select_device(),
                     _ => {}
                 },
@@ -112,12 +112,16 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<(), 
                         app.current_widget = CurrentWidget::Devices;
                         app.currently_setting = None;
                     }
-                    KeyCode::Enter => app.set_color_brightness(),
+                    KeyCode::Enter => app.set_color_and_brightness(),
                     KeyCode::Backspace => {
                         if let Some(setting) = &app.currently_setting {
                             match setting {
-                                CurrentlySetting::Color => app.color_input.pop(),
-                                CurrentlySetting::Brightness => app.brightness_input.pop(),
+                                CurrentlySetting::Color => {
+                                    if app.color_input.len() > 1 {
+                                        app.color_input.pop();
+                                    }
+                                }
+                                CurrentlySetting::Brightness => _ = app.brightness_input.pop(),
                             };
                         }
                     }
@@ -130,11 +134,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<(), 
                                         app.color_input.push(c);
                                     }
                                 }
-                                CurrentlySetting::Brightness => {
-                                    if app.brightness_input.len() < 7 {
-                                        app.brightness_input.push(c);
-                                    }
-                                }
+                                CurrentlySetting::Brightness => app.brightness_input.push(c),
                             }
                         }
                     }

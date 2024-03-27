@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
-use ureq::{Agent, Error};
+use std::error::Error;
+use ureq::Agent;
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Bulb {
@@ -30,7 +31,7 @@ impl Device {
         }
     }
 
-    pub fn update(&mut self, agent: &Agent) -> Result<(), Error> {
+    pub fn update(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
         let b: Bulb = agent
             .get(format!("http://{}/led", self.ip).as_str())
             .call()?
@@ -39,7 +40,7 @@ impl Device {
         Ok(())
     }
 
-    pub fn on(&mut self, agent: &Agent) -> Result<(), Error> {
+    pub fn on(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
         agent
             .get(format!("http://{}/led/on", self.ip).as_str())
             .call()?;
@@ -47,7 +48,7 @@ impl Device {
         Ok(())
     }
 
-    pub fn off(&mut self, agent: &Agent) -> Result<(), Error> {
+    pub fn off(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
         agent
             .get(format!("http://{}/led/off", self.ip).as_str())
             .call()?;
@@ -55,24 +56,31 @@ impl Device {
         Ok(())
     }
 
-    pub fn toggle(&mut self, agent: &Agent) -> Result<(), Error> {
-        self.update(agent)?;
+    pub fn toggle(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
         if self.bulb.enabled == 1 {
-            self.off(agent)
+            self.off(agent)?;
         } else {
-            self.on(agent)
+            self.on(agent)?;
         }
+        self.update(agent)
     }
 
-    pub fn set_color(&mut self, agent: &Agent, color: &str) -> Result<(), Error> {
+    pub fn set_color(&mut self, agent: &Agent, color: &str) -> Result<(), Box<dyn Error>> {
         agent
-            .put(format!("http://{}/led/color/{}", self.ip, color).as_str())
+            .put(
+                format!(
+                    "http://{}/led/color/{}",
+                    self.ip,
+                    color.strip_prefix('#').unwrap_or(color)
+                )
+                .as_str(),
+            )
             .call()?;
         self.bulb.color = color.to_string();
         Ok(())
     }
 
-    pub fn set_brightness(&mut self, agent: &Agent, brightness: f32) -> Result<(), Error> {
+    pub fn set_brightness(&mut self, agent: &Agent, brightness: f32) -> Result<(), Box<dyn Error>> {
         agent
             .put(format!("http://{}/led/brightness/{}", self.ip, brightness).as_str())
             .call()?;
@@ -102,7 +110,7 @@ pub struct Devices {
 }
 
 impl Devices {
-    pub fn update(&mut self, agent: &Agent) -> Result<(), Error> {
+    pub fn update(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
                 self.bulbs[i].update(agent)?;
@@ -111,7 +119,7 @@ impl Devices {
         Ok(())
     }
 
-    pub fn on(&mut self, agent: &Agent) -> Result<(), Error> {
+    pub fn on(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
                 self.bulbs[i].on(agent)?;
@@ -119,7 +127,8 @@ impl Devices {
         }
         Ok(())
     }
-    pub fn off(&mut self, agent: &Agent) -> Result<(), Error> {
+
+    pub fn off(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
                 self.bulbs[i].off(agent)?;
@@ -128,7 +137,7 @@ impl Devices {
         Ok(())
     }
 
-    pub fn toggle(&mut self, agent: &Agent) -> Result<(), Error> {
+    pub fn toggle(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
         let mut first = 0;
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
@@ -136,19 +145,15 @@ impl Devices {
                 break;
             }
         }
-        for i in 0..self.bulbs.len() {
-            if self.bulbs[i].selected {
-                if first == 1 {
-                    self.bulbs[i].off(agent)?;
-                } else {
-                    self.bulbs[i].on(agent)?;
-                }
-            }
+        if first == 1 {
+            self.off(agent)?;
+        } else {
+            self.on(agent)?;
         }
         Ok(())
     }
 
-    pub fn set_color(&mut self, agent: &Agent, color: &str) -> Result<(), Error> {
+    pub fn set_color(&mut self, agent: &Agent, color: &str) -> Result<(), Box<dyn Error>> {
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
                 self.bulbs[i].set_color(agent, color)?;
@@ -157,7 +162,7 @@ impl Devices {
         Ok(())
     }
 
-    pub fn set_brightness(&mut self, agent: &Agent, brightness: f32) -> Result<(), Error> {
+    pub fn set_brightness(&mut self, agent: &Agent, brightness: f32) -> Result<(), Box<dyn Error>> {
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
                 self.bulbs[i].set_brightness(agent, brightness)?;

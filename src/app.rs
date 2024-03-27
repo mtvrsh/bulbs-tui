@@ -95,31 +95,28 @@ impl App {
     }
 
     pub fn open_settings(&mut self) {
-        self.color_input = self.current_device().bulb.color.clone();
-        self.brightness_input = self.current_device().bulb.brightness.to_string();
-        if !self.devices.bulbs.is_empty() {
+        if let Some(first) = self.devices.bulbs.iter().find(|d| d.selected) {
+            self.color_input = first.bulb.color.to_string();
+            self.brightness_input = first.bulb.brightness.to_string();
             self.current_widget = CurrentWidget::DeviceSettings;
             self.currently_setting = Some(CurrentlySetting::Color);
         }
     }
 
-    pub fn load_config(&mut self) -> Result<(), Box<dyn Error>> {
-        let cfg = fs::read_to_string(self.config_path.as_path())?;
-        let ds: Devices = toml::from_str(cfg.as_str())
-            .map_err(|e| format!("Failed to parse config file: {e}"))?;
-        self.devices = ds;
-        Ok(())
-    }
-
-    pub fn save_config(&mut self) {
-        match toml::to_string(&self.devices) {
-            Ok(v) => {
-                if let Err(e) = fs::write(self.config_path.as_path(), v) {
-                    log!(self, format!("Failed to save config file: {e}"));
+    pub fn load_config(&mut self) {
+        if let Ok(cfg) = fs::read_to_string(self.config_path.as_path()) {
+            let ds: Devices = match toml::from_str(cfg.as_str()) {
+                Ok(v) => v,
+                Err(e) => {
+                    log!(self, format!("Failed to parse config file: {e}"));
+                    return;
                 }
+            };
+            self.devices = ds;
+            if let Err(e) = self.devices.update(&self.agent) {
+                log!(self, e.to_string());
             }
-            Err(e) => log!(self, format!("Failed to deserialize config file: {e}")),
-        }
+        };
     }
 
     pub fn save_and_quit(&mut self) -> Result<(), Box<dyn Error>> {
@@ -149,8 +146,10 @@ impl App {
     }
 
     pub fn remove_device(&mut self) {
-        self.devices.bulbs.remove(self.current_device_index);
-        self.prev_device();
+        if !self.devices.bulbs.is_empty() {
+            self.devices.bulbs.remove(self.current_device_index);
+            self.prev_device();
+        }
     }
 
     pub fn add_device(&mut self) {
@@ -179,6 +178,12 @@ impl App {
         self.current_widget = CurrentWidget::Devices;
     }
 
+    pub fn update_devices(&mut self) {
+        if let Err(e) = self.devices.update(&self.agent) {
+            log!(self, e.to_string());
+        }
+    }
+
     pub fn discover(&mut self) {
         log!(self, "discover, is not implemented".to_string());
     }
@@ -190,20 +195,22 @@ impl App {
     }
 
     pub fn toggle_current(&mut self) {
-        if let Err(e) = self.devices.bulbs[self.current_device_index].toggle(&self.agent) {
-            log!(self, e.to_string());
+        if !self.devices.bulbs.is_empty() {
+            if let Err(e) = self.devices.bulbs[self.current_device_index].toggle(&self.agent) {
+                log!(self, e.to_string());
+            }
         }
     }
 
-    pub fn set_color_brightness(&mut self) {
+    pub fn set_color_and_brightness(&mut self) {
         if !self.color_input.is_empty() {
             if let Err(e) = self
                 .devices
-                .set_color(&self.agent, self.color_input.as_str())
+                .set_color(&self.agent, self.color_input.to_string().as_str())
             {
                 log!(self, e.to_string());
             }
-            self.color_input.clear();
+            self.color_input = "#".to_string();
         }
 
         let brightness = self.brightness_input.parse::<f32>();
