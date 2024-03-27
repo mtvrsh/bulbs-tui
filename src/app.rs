@@ -198,7 +198,7 @@ impl App {
         if !self.color_input.is_empty() {
             if let Err(e) = self
                 .devices
-                .set_color(&self.agent, self.color_input.clone())
+                .set_color(&self.agent, self.color_input.as_str())
             {
                 log!(self, e.to_string());
             }

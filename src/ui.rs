@@ -95,19 +95,13 @@ pub fn ui(f: &mut Frame, app: &App) {
 
 fn render_device_adding(f: &mut Frame, app: &App) {
     if let Some(adding) = &app.currently_adding {
-        let popup_block = Block::default()
-            .title("Add new device")
-            .title_alignment(Alignment::Center)
-            .borders(Borders::NONE)
-            .bg(Color::Reset)
-            .style(Style::default());
+        let popup_block = Block::default().borders(Borders::NONE);
 
-        let area = centered_rect(50, 50, f.size());
+        let area = centered_rect(40, 40, f.size());
         f.render_widget(popup_block, area);
 
         let popup_chunks = Layout::default()
             .direction(Direction::Vertical)
-            .margin(1)
             .constraints([Constraint::Length(3), Constraint::Length(3)])
             .split(area);
 
@@ -120,7 +114,8 @@ fn render_device_adding(f: &mut Frame, app: &App) {
             CurrentlyAdding::Name => name_block = name_block.style(active_style),
         };
 
-        f.render_widget(Clear, area);
+        f.render_widget(Clear, popup_chunks[0]);
+        f.render_widget(Clear, popup_chunks[1]);
 
         let key_text = Paragraph::new(app.ip_input.clone()).block(ip_block);
         f.render_widget(key_text, popup_chunks[0]);
@@ -132,19 +127,13 @@ fn render_device_adding(f: &mut Frame, app: &App) {
 
 fn render_color_picker(f: &mut Frame, app: &App) {
     if let Some(setting) = &app.currently_setting {
-        let popup_block = Block::default()
-            .title("Device settings")
-            .title_alignment(Alignment::Center)
-            .borders(Borders::NONE)
-            .bg(Color::Reset)
-            .style(Style::default());
+        let popup_block = Block::default().borders(Borders::NONE);
 
-        let area = centered_rect(50, 50, f.size());
+        let area = centered_rect(40, 40, f.size());
         f.render_widget(popup_block, area);
 
         let popup_chunks = Layout::default()
             .direction(Direction::Vertical)
-            .margin(1)
             .constraints([Constraint::Length(3), Constraint::Length(3)])
             .split(area);
 
@@ -163,7 +152,8 @@ fn render_color_picker(f: &mut Frame, app: &App) {
             CurrentlySetting::Brightness => brightness_block = brightness_block.style(active_style),
         };
 
-        f.render_widget(Clear, area);
+        f.render_widget(Clear, popup_chunks[0]);
+        f.render_widget(Clear, popup_chunks[1]);
 
         let color_text = Paragraph::new(app.color_input.clone()).block(color_block);
         f.render_widget(color_text, popup_chunks[0]);

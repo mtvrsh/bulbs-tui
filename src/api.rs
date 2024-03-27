@@ -64,11 +64,11 @@ impl Device {
         }
     }
 
-    pub fn set_color(&mut self, agent: &Agent, color: &String) -> Result<(), Error> {
+    pub fn set_color(&mut self, agent: &Agent, color: &str) -> Result<(), Error> {
         agent
             .put(format!("http://{}/led/color/{}", self.ip, color).as_str())
             .call()?;
-        self.bulb.color = color.clone();
+        self.bulb.color = color.to_string();
         Ok(())
     }
 
@@ -102,7 +102,7 @@ pub struct Devices {
 }
 
 impl Devices {
-    pub fn status(&mut self, agent: &Agent) -> Result<(), Error> {
+    pub fn update(&mut self, agent: &Agent) -> Result<(), Error> {
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
                 self.bulbs[i].update(agent)?;
@@ -148,10 +148,10 @@ impl Devices {
         Ok(())
     }
 
-    pub fn set_color(&mut self, agent: &Agent, color: String) -> Result<(), Error> {
+    pub fn set_color(&mut self, agent: &Agent, color: &str) -> Result<(), Error> {
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
-                self.bulbs[i].set_color(agent, &color)?;
+                self.bulbs[i].set_color(agent, color)?;
             }
         }
         Ok(())
