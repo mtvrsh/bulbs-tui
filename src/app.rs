@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf, time::Duration};
+use std::{error::Error, fs, path::PathBuf, time::Duration};
 use ureq::{Agent, AgentBuilder};
 
 use crate::api::{Device, Devices};
@@ -103,28 +103,29 @@ impl App {
         }
     }
 
-    pub fn load_config(&mut self) {
-        if let Ok(v) = fs::read_to_string(self.config_path.as_path()) {
-            let ds: Devices = match toml::from_str(v.as_str()) {
-                Ok(v) => v,
-                Err(e) => {
-                    log!(self, format!("failed to parse config file: {e}"));
-                    return;
-                }
-            };
-            self.devices = ds;
-        };
+    pub fn load_config(&mut self) -> Result<(), Box<dyn Error>> {
+        let cfg = fs::read_to_string(self.config_path.as_path())?;
+        let ds: Devices = toml::from_str(cfg.as_str())
+            .map_err(|e| format!("Failed to parse config file: {e}"))?;
+        self.devices = ds;
+        Ok(())
     }
 
     pub fn save_config(&mut self) {
         match toml::to_string(&self.devices) {
             Ok(v) => {
                 if let Err(e) = fs::write(self.config_path.as_path(), v) {
-                    log!(self, format!("failed to save config file: {e}"));
+                    log!(self, format!("Failed to save config file: {e}"));
                 }
             }
-            Err(e) => log!(self, format!("failed to deserialize config file: {e}")),
+            Err(e) => log!(self, format!("Failed to deserialize config file: {e}")),
         }
+    }
+
+    pub fn save_and_quit(&mut self) -> Result<(), Box<dyn Error>> {
+        let devices = toml::to_string(&self.devices)?;
+        Ok(fs::write(self.config_path.as_path(), devices)
+            .map_err(|e| format!("Failed to save config: {e}"))?)
     }
 
     fn current_device(&mut self) -> &mut Device {
@@ -156,7 +157,7 @@ impl App {
         if self.devices.bulbs.iter().any(|x| x.ip == self.ip_input) {
             log!(
                 self,
-                format!("device \"{}\" already present on list", self.ip_input)
+                format!("Device \"{}\" already present on list", self.ip_input)
             );
             return;
         }
@@ -229,8 +230,8 @@ impl App {
 }
 
 fn xdg_cfg_path() -> PathBuf {
-    let xdg_dirs = xdg::BaseDirectories::with_prefix("bulbs").expect("failed to get XDG dirs");
+    let xdg_dirs = xdg::BaseDirectories::with_prefix("bulbs").expect("Failed to get XDG dirs");
     xdg_dirs
         .place_config_file("tui.toml")
-        .expect("failed to setup XDG CONFIG dir")
+        .expect("Failed to setup XDG CONFIG dir")
 }

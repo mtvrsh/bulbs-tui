@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     let mut app = App::new(cfg_path);
-    app.load_config();
+    app.load_config()?;
     let res = run_app(&mut terminal, &mut app);
 
     crossterm::terminal::disable_raw_mode()?;
@@ -45,7 +45,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<()> {
+fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<(), Box<dyn Error>> {
     loop {
         terminal.draw(|f| ui::ui(f, app))?;
 
@@ -55,7 +55,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
             }
             match app.current_widget {
                 CurrentWidget::Devices => match key.code {
-                    KeyCode::Esc | KeyCode::Char('q') => return Ok(()),
+                    KeyCode::Esc | KeyCode::Char('q') => return app.save_and_quit(),
                     KeyCode::Enter => app.toggle_current(),
                     KeyCode::Tab | KeyCode::Left | KeyCode::Right | KeyCode::Char('h' | 'l') => {
                         app.current_widget = CurrentWidget::Logs;
@@ -70,13 +70,12 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                     KeyCode::Char('c') => app.open_settings(),
                     KeyCode::Char('d') => app.remove_device(),
                     KeyCode::Char('e') => app.toggle_selected(),
-                    KeyCode::Char('r') => app.load_config(),
                     KeyCode::Char('s') => app.save_config(),
                     KeyCode::Char(' ') => app.select_device(),
                     _ => {}
                 },
                 CurrentWidget::Logs => match key.code {
-                    KeyCode::Esc | KeyCode::Char('q') => return Ok(()),
+                    KeyCode::Esc | KeyCode::Char('q') => return app.save_and_quit(),
                     KeyCode::Backspace => app.logs.clear(),
                     KeyCode::Tab | KeyCode::Left | KeyCode::Right | KeyCode::Char('h' | 'l') => {
                         app.current_widget = CurrentWidget::Devices;
@@ -84,6 +83,10 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                     _ => {}
                 },
                 CurrentWidget::AddDevice => match key.code {
+                    KeyCode::Esc => {
+                        app.current_widget = CurrentWidget::Devices;
+                        app.currently_adding = None;
+                    }
                     KeyCode::Enter => app.add_device(),
                     KeyCode::Backspace => {
                         if let Some(editing) = &app.currently_adding {
@@ -92,10 +95,6 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                                 CurrentlyAdding::Name => app.name_input.pop(),
                             };
                         }
-                    }
-                    KeyCode::Esc => {
-                        app.current_widget = CurrentWidget::Devices;
-                        app.currently_adding = None;
                     }
                     KeyCode::Tab => app.toggle_curr_adding_field(),
                     KeyCode::Char(c) => {
@@ -109,6 +108,10 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                     _ => {}
                 },
                 CurrentWidget::DeviceSettings => match key.code {
+                    KeyCode::Esc | KeyCode::Char('q') => {
+                        app.current_widget = CurrentWidget::Devices;
+                        app.currently_setting = None;
+                    }
                     KeyCode::Enter => app.set_color_brightness(),
                     KeyCode::Backspace => {
                         if let Some(setting) = &app.currently_setting {
@@ -117,10 +120,6 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                                 CurrentlySetting::Brightness => app.brightness_input.pop(),
                             };
                         }
-                    }
-                    KeyCode::Esc | KeyCode::Char('q') => {
-                        app.current_widget = CurrentWidget::Devices;
-                        app.currently_setting = None;
                     }
                     KeyCode::Tab => app.toggle_curr_setting_field(),
                     KeyCode::Char(c) => {
