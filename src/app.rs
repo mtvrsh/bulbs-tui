@@ -113,8 +113,9 @@ impl App {
                 }
             };
             self.devices = ds;
-            if let Err(e) = self.devices.update(&self.agent) {
-                log!(self, e.to_string());
+            match self.devices.update(&self.agent) {
+                Ok(v) => log!(self, v),
+                Err(e) => log!(self, e.to_string()),
             }
         };
     }
@@ -162,13 +163,19 @@ impl App {
         }
         if !self.ip_input.is_empty() {
             let mut bulb = Device::new(self.ip_input.clone(), self.name_input.clone());
-            if let Err(e) = bulb.update(&self.agent) {
-                log!(self, e.to_string());
-                return;
+            match bulb.update(&self.agent) {
+                Ok(v) => log!(self, v),
+                Err(e) => {
+                    log!(self, e.to_string());
+                    return;
+                }
             }
-            if let Err(e) = bulb.on(&self.agent) {
-                log!(self, e.to_string());
-                return;
+            match bulb.on(&self.agent) {
+                Ok(v) => log!(self, v),
+                Err(e) => {
+                    log!(self, e.to_string());
+                    return;
+                }
             }
             self.devices.bulbs.push(bulb);
             self.ip_input.clear();
@@ -179,8 +186,9 @@ impl App {
     }
 
     pub fn update_devices(&mut self) {
-        if let Err(e) = self.devices.update(&self.agent) {
-            log!(self, e.to_string());
+        match self.devices.update(&self.agent) {
+            Ok(v) => log!(self, v),
+            Err(e) => log!(self, e.to_string()),
         }
     }
 
@@ -189,26 +197,29 @@ impl App {
     }
 
     pub fn toggle_selected(&mut self) {
-        if let Err(e) = self.devices.toggle(&self.agent) {
-            log!(self, e.to_string());
+        match self.devices.toggle(&self.agent) {
+            Ok(v) => log!(self, v),
+            Err(e) => log!(self, e.to_string()),
         }
     }
 
     pub fn toggle_current(&mut self) {
         if !self.devices.bulbs.is_empty() {
-            if let Err(e) = self.devices.bulbs[self.current_device_index].toggle(&self.agent) {
-                log!(self, e.to_string());
+            match self.devices.bulbs[self.current_device_index].toggle(&self.agent) {
+                Ok(v) => log!(self, v),
+                Err(e) => log!(self, e.to_string()),
             }
         }
     }
 
     pub fn set_color_and_brightness(&mut self) {
         if !self.color_input.is_empty() {
-            if let Err(e) = self
+            match self
                 .devices
-                .set_color(&self.agent, self.color_input.to_string().as_str())
+                .set_color(&self.agent, self.color_input.as_str())
             {
-                log!(self, e.to_string());
+                Err(e) => log!(self, e.to_string()),
+                Ok(v) => log!(self, v),
             }
             self.color_input = "#".to_string();
         }
@@ -223,8 +234,9 @@ impl App {
                 // compare floats with error margin, ty clippy
                 let error_margin = f32::EPSILON;
                 if (v - self.current_device().bulb.brightness).abs() > error_margin {
-                    if let Err(e) = self.devices.set_brightness(&self.agent, v) {
-                        log!(self, e.to_string());
+                    match self.devices.set_brightness(&self.agent, v) {
+                        Ok(v) => log!(self, v),
+                        Err(e) => log!(self, e.to_string()),
                     }
                     self.brightness_input.clear();
                 }
@@ -240,5 +252,5 @@ fn xdg_cfg_path() -> PathBuf {
     let xdg_dirs = xdg::BaseDirectories::with_prefix("bulbs").expect("Failed to get XDG dirs");
     xdg_dirs
         .place_config_file("tui.toml")
-        .expect("Failed to setup XDG CONFIG dir")
+        .unwrap_or_else(|_| "config.toml".into())
 }

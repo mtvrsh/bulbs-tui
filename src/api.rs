@@ -31,42 +31,43 @@ impl Device {
         }
     }
 
-    pub fn update(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
-        let b: Bulb = agent
+    pub fn update(&mut self, agent: &Agent) -> Result<String, Box<dyn Error>> {
+        let resp = agent
             .get(format!("http://{}/led", self.ip).as_str())
-            .call()?
-            .into_json()?;
-        self.bulb = b;
-        Ok(())
+            .call()?;
+        let s = resp.into_string()?;
+        self.bulb = serde_json::from_str(&s)?;
+        Ok(s)
     }
 
-    pub fn on(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
-        agent
+    pub fn on(&mut self, agent: &Agent) -> Result<String, Box<dyn Error>> {
+        let s = agent
             .get(format!("http://{}/led/on", self.ip).as_str())
-            .call()?;
+            .call()?
+            .into_string()?;
         self.bulb.enabled = 1;
-        Ok(())
+        Ok(s)
     }
 
-    pub fn off(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
-        agent
+    pub fn off(&mut self, agent: &Agent) -> Result<String, Box<dyn Error>> {
+        let s = agent
             .get(format!("http://{}/led/off", self.ip).as_str())
-            .call()?;
+            .call()?
+            .into_string()?;
         self.bulb.enabled = 0;
-        Ok(())
+        Ok(s)
     }
 
-    pub fn toggle(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
+    pub fn toggle(&mut self, agent: &Agent) -> Result<String, Box<dyn Error>> {
         if self.bulb.enabled == 1 {
-            self.off(agent)?;
+            self.off(agent)
         } else {
-            self.on(agent)?;
+            self.on(agent)
         }
-        self.update(agent)
     }
 
-    pub fn set_color(&mut self, agent: &Agent, color: &str) -> Result<(), Box<dyn Error>> {
-        agent
+    pub fn set_color(&mut self, agent: &Agent, color: &str) -> Result<String, Box<dyn Error>> {
+        let s = agent
             .put(
                 format!(
                     "http://{}/led/color/{}",
@@ -75,17 +76,23 @@ impl Device {
                 )
                 .as_str(),
             )
-            .call()?;
+            .call()?
+            .into_string()?;
         self.bulb.color = color.to_string();
-        Ok(())
+        Ok(s)
     }
 
-    pub fn set_brightness(&mut self, agent: &Agent, brightness: f32) -> Result<(), Box<dyn Error>> {
-        agent
+    pub fn set_brightness(
+        &mut self,
+        agent: &Agent,
+        brightness: f32,
+    ) -> Result<String, Box<dyn Error>> {
+        let s = agent
             .put(format!("http://{}/led/brightness/{}", self.ip, brightness).as_str())
-            .call()?;
+            .call()?
+            .into_string()?;
         self.bulb.brightness = brightness;
-        Ok(())
+        Ok(s)
     }
 }
 
@@ -110,34 +117,37 @@ pub struct Devices {
 }
 
 impl Devices {
-    pub fn update(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
+    pub fn update(&mut self, agent: &Agent) -> Result<String, Box<dyn Error>> {
+        let mut s = String::new();
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
-                self.bulbs[i].update(agent)?;
+                s.push_str(&self.bulbs[i].update(agent)?);
             }
         }
-        Ok(())
+        Ok(s)
     }
 
-    pub fn on(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
+    pub fn on(&mut self, agent: &Agent) -> Result<String, Box<dyn Error>> {
+        let mut s = String::new();
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
-                self.bulbs[i].on(agent)?;
+                s.push_str(&self.bulbs[i].on(agent)?);
             }
         }
-        Ok(())
+        Ok(s)
     }
 
-    pub fn off(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
+    pub fn off(&mut self, agent: &Agent) -> Result<String, Box<dyn Error>> {
+        let mut s = String::new();
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
-                self.bulbs[i].off(agent)?;
+                s.push_str(&self.bulbs[i].off(agent)?);
             }
         }
-        Ok(())
+        Ok(s)
     }
 
-    pub fn toggle(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
+    pub fn toggle(&mut self, agent: &Agent) -> Result<String, Box<dyn Error>> {
         let mut first = 0;
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
@@ -146,32 +156,38 @@ impl Devices {
             }
         }
         if first == 1 {
-            self.off(agent)?;
+            self.off(agent)
         } else {
-            self.on(agent)?;
+            self.on(agent)
         }
-        Ok(())
     }
 
-    pub fn set_color(&mut self, agent: &Agent, color: &str) -> Result<(), Box<dyn Error>> {
+    pub fn set_color(&mut self, agent: &Agent, color: &str) -> Result<String, Box<dyn Error>> {
+        let mut s = String::new();
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
-                self.bulbs[i].set_color(agent, color)?;
+                s.push_str(&self.bulbs[i].set_color(agent, color)?);
             }
         }
-        Ok(())
+        Ok(s)
     }
 
-    pub fn set_brightness(&mut self, agent: &Agent, brightness: f32) -> Result<(), Box<dyn Error>> {
+    pub fn set_brightness(
+        &mut self,
+        agent: &Agent,
+        brightness: f32,
+    ) -> Result<String, Box<dyn Error>> {
+        let mut s = String::new();
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
-                self.bulbs[i].set_brightness(agent, brightness)?;
+                s.push_str(&self.bulbs[i].set_brightness(agent, brightness)?);
             }
         }
-        Ok(())
+        Ok(s)
     }
 }
 
+// for serde default value = true
 const fn tt() -> bool {
     true
 }
