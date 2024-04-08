@@ -70,7 +70,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<(), 
                     KeyCode::Char('c') => app.open_settings(),
                     KeyCode::Char('d') => app.remove_device(),
                     KeyCode::Char('e') => app.toggle_selected(),
-                    KeyCode::Char('r') => app.update_devices(),
+                    KeyCode::Char('r') => app.refresh_devices(),
                     KeyCode::Char(' ') => app.select_device(),
                     _ => {}
                 },
@@ -96,7 +96,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<(), 
                             };
                         }
                     }
-                    KeyCode::Tab => app.toggle_curr_adding_field(),
+                    KeyCode::Tab | KeyCode::Up | KeyCode::Down => app.toggle_adding_field(),
                     KeyCode::Char(c) => {
                         if let Some(editing) = &app.currently_adding {
                             match editing {
@@ -125,7 +125,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<(), 
                             };
                         }
                     }
-                    KeyCode::Tab => app.toggle_curr_setting_field(),
+                    KeyCode::Tab | KeyCode::Up | KeyCode::Down => app.toggle_settings_field(),
                     KeyCode::Char(c) => {
                         if let Some(setting) = &app.currently_setting {
                             match setting {

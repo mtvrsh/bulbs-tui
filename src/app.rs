@@ -67,7 +67,7 @@ impl App {
         }
     }
 
-    pub fn toggle_curr_adding_field(&mut self) {
+    pub fn toggle_adding_field(&mut self) {
         if let Some(edit_mode) = &self.currently_adding {
             match edit_mode {
                 CurrentlyAdding::IP => self.currently_adding = Some(CurrentlyAdding::Name),
@@ -78,7 +78,7 @@ impl App {
         }
     }
 
-    pub fn toggle_curr_setting_field(&mut self) {
+    pub fn toggle_settings_field(&mut self) {
         if let Some(edit_mode) = &self.currently_setting {
             match edit_mode {
                 CurrentlySetting::Color => {
@@ -185,7 +185,7 @@ impl App {
         self.current_widget = CurrentWidget::Devices;
     }
 
-    pub fn update_devices(&mut self) {
+    pub fn refresh_devices(&mut self) {
         match self.devices.update(&self.agent) {
             Ok(v) => log!(self, v),
             Err(e) => log!(self, e.to_string()),
@@ -193,7 +193,7 @@ impl App {
     }
 
     pub fn discover(&mut self) {
-        log!(self, "discover, is not implemented".to_string());
+        log!(self, "not implemented".to_string());
     }
 
     pub fn toggle_selected(&mut self) {

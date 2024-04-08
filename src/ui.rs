@@ -17,14 +17,51 @@ pub fn ui(f: &mut Frame, app: &App) {
         ])
         .split(f.size());
 
+    let help: Line<'_>;
     let mut log_block = Block::default().borders(Borders::ALL);
     let mut devices_block = Block::default().borders(Borders::ALL);
+
     match &app.current_widget {
         CurrentWidget::Devices => {
+            help = Line::from(vec![
+                "[a]".blue().bold(),
+                ":add device ".white(),
+                "[A]".blue().bold(),
+                ":autodetect ".white(),
+                "<c>".blue().bold(),
+                ":change color ".white(),
+                "[d]".blue().bold(),
+                ":remove ".white(),
+                "<e>".blue().bold(),
+                ":ON/OFF ".white(),
+                "<r>".blue().bold(),
+                ":refresh ".white(),
+                "<enter>".blue().bold(),
+                ":ON/OFF (one) ".white(),
+                "<space>".blue().bold(),
+                ":select ".white(),
+                "<q>".blue().bold(),
+                ":quit".white(),
+            ]);
             devices_block = devices_block.border_style(Style::new().light_blue());
         }
-        CurrentWidget::Logs => log_block = log_block.border_style(Style::new().light_blue()),
-        CurrentWidget::DeviceSettings | CurrentWidget::AddDevice => (),
+        CurrentWidget::Logs => {
+            log_block = log_block.border_style(Style::new().light_blue());
+            help = Line::from(vec![
+                "<backspace>".blue().bold(),
+                ":clear ".white(),
+                "<q>".blue().bold(),
+                ":quit".white(),
+            ]);
+        }
+        CurrentWidget::DeviceSettings | CurrentWidget::AddDevice => {
+            help = Line::from(vec![
+                "<enter>".blue().bold(),
+                ":apply ".white(),
+                "<esc>".blue().bold(),
+                ":cancel".white(),
+            ]);
+        }
     }
 
     let mut list_items = Vec::<ListItem>::new();
@@ -48,23 +85,6 @@ pub fn ui(f: &mut Frame, app: &App) {
     }
 
     let devices = List::new(list_items).block(devices_block.title("Devices"));
-
-    let help = Line::from(vec![
-        "[a]".blue().bold(),
-        ":add device ".white(),
-        "[A]".blue().bold(),
-        ":discover devices ".white(),
-        "<c>".blue().bold(),
-        ":change color ".white(),
-        "[d]".blue().bold(),
-        ":remove device ".white(),
-        "<e>".blue().bold(),
-        ":ON/OFF ".white(),
-        "<q>".blue().bold(),
-        ":quit ".white(),
-        "<space>".blue().bold(),
-        ":select ".white(),
-    ]);
 
     let ll: Vec<String> = app
         .logs
