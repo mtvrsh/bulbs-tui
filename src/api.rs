@@ -68,14 +68,7 @@ impl Device {
 
     pub fn set_color(&mut self, agent: &Agent, color: &str) -> Result<String, Box<dyn Error>> {
         let s = agent
-            .put(
-                format!(
-                    "http://{}/led/color/{}",
-                    self.ip,
-                    color.strip_prefix('#').unwrap_or(color)
-                )
-                .as_str(),
-            )
+            .put(format!("http://{}/led/color/{}", self.ip, color).as_str())
             .call()?
             .into_string()?;
         self.bulb.color = color.to_string();

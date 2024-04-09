@@ -1,6 +1,6 @@
 use ratatui::{
     prelude::*,
-    widgets::{block::Block, Borders, Clear, List, ListItem, Paragraph, Wrap},
+    widgets::{block::Block, Borders, Clear, List, ListItem, Paragraph},
     Frame,
 };
 
@@ -86,16 +86,18 @@ pub fn ui(f: &mut Frame, app: &App) {
 
     let devices = List::new(list_items).block(devices_block.title("Devices"));
 
-    let ll: Vec<String> = app
-        .logs
-        .iter()
-        .take(chunks[2].height as usize - 2)
-        .rev()
-        .map(|l| l.replace('\n', " "))
-        .collect();
+    let ll: Vec<String> = app.logs.iter().map(|l| l.replace('\n', " ")).collect();
+    let llen: u16 = app.logs.len().try_into().unwrap_or_default();
+    let paragraph_size = chunks[2].height.saturating_sub(4);
+    let scroll = if llen >= paragraph_size {
+        llen - paragraph_size
+    } else {
+        0
+    };
+
     let logs = Paragraph::new(ll.join("\n"))
         .block(log_block.title("Logs").title_bottom(help))
-        .wrap(Wrap { trim: true });
+        .scroll((scroll.saturating_sub(2), app.log_horizontal_offset));
 
     let header = Paragraph::new("bulbs-tui").alignment(Alignment::Center);
     f.render_widget(header, chunks[0]);

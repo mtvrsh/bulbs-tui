@@ -31,6 +31,7 @@ pub struct App {
     pub currently_adding: Option<CurrentlyAdding>,
     pub currently_setting: Option<CurrentlySetting>,
 
+    pub log_horizontal_offset: u16,
     pub color_input: String,
     pub brightness_input: String,
     pub ip_input: String,
@@ -39,7 +40,7 @@ pub struct App {
 
 macro_rules! log {
     ($app:expr, $line:expr) => {{
-        $app.logs.insert(0, $line);
+        $app.logs.push($line);
     }};
 }
 
@@ -60,6 +61,7 @@ impl App {
             currently_adding: None,
             currently_setting: None,
 
+            log_horizontal_offset: 0,
             color_input: String::new(),
             brightness_input: String::new(),
             ip_input: String::new(),
@@ -101,6 +103,13 @@ impl App {
             self.current_widget = CurrentWidget::DeviceSettings;
             self.currently_setting = Some(CurrentlySetting::Color);
         }
+    }
+
+    pub fn scroll_logs_left(&mut self) {
+        self.log_horizontal_offset = self.log_horizontal_offset.saturating_sub(4);
+    }
+    pub fn scroll_logs_right(&mut self) {
+        self.log_horizontal_offset = self.log_horizontal_offset.saturating_add(4);
     }
 
     pub fn load_config(&mut self) {
@@ -213,10 +222,11 @@ impl App {
     }
 
     pub fn set_color_and_brightness(&mut self) {
-        if !self.color_input.is_empty() {
+        if !self.color_input.is_empty() || self.color_input.len() == 6 {
+            let color = self.color_input.as_str();
             match self
                 .devices
-                .set_color(&self.agent, self.color_input.as_str())
+                .set_color(&self.agent, color.strip_prefix('#').unwrap_or(color))
             {
                 Err(e) => log!(self, e.to_string()),
                 Ok(v) => log!(self, v),

@@ -57,7 +57,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<(), 
                 CurrentWidget::Devices => match key.code {
                     KeyCode::Esc | KeyCode::Char('q') => return app.save_and_quit(),
                     KeyCode::Enter => app.toggle_current(),
-                    KeyCode::Tab | KeyCode::Left | KeyCode::Right | KeyCode::Char('h' | 'l') => {
+                    KeyCode::Tab => {
                         app.current_widget = CurrentWidget::Logs;
                     }
                     KeyCode::Up | KeyCode::Char('k') => app.prev_device(),
@@ -77,9 +77,11 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<(), 
                 CurrentWidget::Logs => match key.code {
                     KeyCode::Esc | KeyCode::Char('q') => return app.save_and_quit(),
                     KeyCode::Backspace => app.logs.clear(),
-                    KeyCode::Tab | KeyCode::Left | KeyCode::Right | KeyCode::Char('h' | 'l') => {
+                    KeyCode::Tab => {
                         app.current_widget = CurrentWidget::Devices;
                     }
+                    KeyCode::Left | KeyCode::Char('h') => app.scroll_logs_left(),
+                    KeyCode::Right | KeyCode::Char('l') => app.scroll_logs_right(),
                     _ => {}
                 },
                 CurrentWidget::AddDevice => match key.code {
