@@ -40,25 +40,24 @@ impl Device {
         Ok(s)
     }
 
-    pub fn on(&mut self, agent: &Agent) -> Result<String, Box<dyn Error>> {
-        let s = agent
-            .get(format!("http://{}/led/on", self.ip).as_str())
-            .call()?
-            .into_string()?;
+    pub fn on(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
+        agent
+            .put(format!("http://{}/led/on", self.ip).as_str())
+            .call()?;
         self.bulb.enabled = 1;
-        Ok(s)
+        Ok(())
     }
 
-    pub fn off(&mut self, agent: &Agent) -> Result<String, Box<dyn Error>> {
-        let s = agent
-            .get(format!("http://{}/led/off", self.ip).as_str())
+    pub fn off(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
+        agent
+            .put(format!("http://{}/led/off", self.ip).as_str())
             .call()?
             .into_string()?;
         self.bulb.enabled = 0;
-        Ok(s)
+        Ok(())
     }
 
-    pub fn toggle(&mut self, agent: &Agent) -> Result<String, Box<dyn Error>> {
+    pub fn toggle(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
         if self.bulb.enabled == 1 {
             self.off(agent)
         } else {
@@ -71,7 +70,7 @@ impl Device {
             .put(format!("http://{}/led/color/{}", self.ip, color).as_str())
             .call()?
             .into_string()?;
-        self.bulb.color = color.to_string();
+        self.bulb.color = "#".to_owned() + color;
         Ok(s)
     }
 
@@ -93,11 +92,12 @@ impl std::fmt::Display for Device {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "{} {:16} {:20} {:3} {:7}",
+            "{} {:16} {:16} {:3} {:4} {:7}",
             if self.selected { ">" } else { " " },
             self.ip,
             self.name,
             if self.bulb.enabled == 1 { "ON" } else { "OFF" },
+            self.bulb.brightness,
             self.bulb.color,
         )
     }
@@ -120,27 +120,25 @@ impl Devices {
         Ok(s)
     }
 
-    pub fn on(&mut self, agent: &Agent) -> Result<String, Box<dyn Error>> {
-        let mut s = String::new();
+    pub fn on(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
-                s.push_str(&self.bulbs[i].on(agent)?);
+                self.bulbs[i].on(agent)?;
             }
         }
-        Ok(s)
+        Ok(())
     }
 
-    pub fn off(&mut self, agent: &Agent) -> Result<String, Box<dyn Error>> {
-        let mut s = String::new();
+    pub fn off(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
-                s.push_str(&self.bulbs[i].off(agent)?);
+                self.bulbs[i].off(agent)?;
             }
         }
-        Ok(s)
+        Ok(())
     }
 
-    pub fn toggle(&mut self, agent: &Agent) -> Result<String, Box<dyn Error>> {
+    pub fn toggle(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
         let mut first = 0;
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {

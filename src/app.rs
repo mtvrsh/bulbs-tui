@@ -179,12 +179,9 @@ impl App {
                     return;
                 }
             }
-            match bulb.on(&self.agent) {
-                Ok(v) => log!(self, v),
-                Err(e) => {
-                    log!(self, e.to_string());
-                    return;
-                }
+            if let Err(e) = bulb.on(&self.agent) {
+                log!(self, e.to_string());
+                return;
             }
             self.devices.bulbs.push(bulb);
             self.ip_input.clear();
@@ -207,7 +204,7 @@ impl App {
 
     pub fn toggle_selected(&mut self) {
         match self.devices.toggle(&self.agent) {
-            Ok(v) => log!(self, v),
+            Ok(()) => (),
             Err(e) => log!(self, e.to_string()),
         }
     }
@@ -215,41 +212,40 @@ impl App {
     pub fn toggle_current(&mut self) {
         if !self.devices.bulbs.is_empty() {
             match self.devices.bulbs[self.current_device_index].toggle(&self.agent) {
-                Ok(v) => log!(self, v),
+                Ok(()) => (),
                 Err(e) => log!(self, e.to_string()),
             }
         }
     }
 
     pub fn set_color_and_brightness(&mut self) {
-        if !self.color_input.is_empty() || self.color_input.len() == 6 {
+        if !self.color_input.is_empty() && self.color_input.len() == 7 {
             let color = self.color_input.as_str();
-            match self
+            if let Err(e) = self
                 .devices
                 .set_color(&self.agent, color.strip_prefix('#').unwrap_or(color))
             {
-                Err(e) => log!(self, e.to_string()),
-                Ok(v) => log!(self, v),
+                log!(self, e.to_string());
             }
             self.color_input = "#".to_string();
         }
 
         let brightness = self.brightness_input.parse::<f32>();
         match brightness {
-            Err(e) => {
-                log!(self, e.to_string());
-                return;
-            }
             Ok(v) => {
                 // compare floats with error margin, ty clippy
                 let error_margin = f32::EPSILON;
                 if (v - self.current_device().bulb.brightness).abs() > error_margin {
                     match self.devices.set_brightness(&self.agent, v) {
-                        Ok(v) => log!(self, v),
+                        Ok(_) => (),
                         Err(e) => log!(self, e.to_string()),
                     }
                     self.brightness_input.clear();
                 }
+            }
+            Err(e) => {
+                log!(self, e.to_string());
+                return;
             }
         }
 
