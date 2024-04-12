@@ -16,7 +16,7 @@ pedantic = "warn"
 unwrap_used = "warn"
 
 [dependencies]
-clap = { version = "4.5.3", features = ["derive"] }
+clap = { version = "4.5.3", features = ["derive", "string"] }
 crossterm = "0.27.0"
 ratatui = "0.26.1"
 serde = { version = "1.0.196", features = ["derive"] }

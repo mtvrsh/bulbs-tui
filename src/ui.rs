@@ -12,7 +12,7 @@ pub fn ui(f: &mut Frame, app: &App) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(1),
-            Constraint::Min(app.devices.bulbs.len() as u16 + 2),
+            Constraint::Min(app.config.bulbs.len() as u16 + 2),
             Constraint::Length(app.logs.len() as u16 + 2),
         ])
         .split(f.size());
@@ -66,7 +66,7 @@ pub fn ui(f: &mut Frame, app: &App) {
 
     let mut list_items = Vec::<ListItem>::new();
 
-    for (i, dev) in app.devices.bulbs.iter().enumerate() {
+    for (i, dev) in app.config.bulbs.iter().enumerate() {
         let mut style = Style::default().bold();
         if dev.bulb.enabled == 1 {
             style = style.blue();

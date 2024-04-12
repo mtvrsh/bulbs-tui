@@ -1,5 +1,10 @@
+mod api;
+mod app;
+mod cli;
+mod config;
+mod ui;
+
 use app::CurrentlySetting;
-use clap::Parser;
 use crossterm::{
     event::{Event, KeyCode, KeyEventKind},
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
@@ -8,30 +13,37 @@ use ratatui::{
     backend::{Backend, CrosstermBackend},
     Terminal,
 };
-use std::{error::Error, io, path::PathBuf};
+use std::{error::Error, io};
 
-mod api;
-mod app;
-mod ui;
 use crate::app::{App, CurrentWidget, CurrentlyAdding};
 
-#[derive(Parser)]
-#[command(about, version)]
-struct Cli {
-    /// Path to config file
-    #[arg(short, long, value_name = "PATH")]
-    config: Option<PathBuf>,
-}
-
 fn main() -> Result<(), Box<dyn Error>> {
-    let cfg_path = Cli::parse().config;
+    let cli = cli::parse();
+
+    let cfg = config::load(cli.config.clone()).unwrap_or_default();
+    match cli.run(&mut cfg.clone()) {
+        Ok(v) => {
+            if let Some(v) = v.0 {
+                print!("{v}");
+            }
+            if !v.1 {
+                // if cli did something do not run tui
+                return Ok(());
+            }
+        }
+        Err(e) => {
+            eprintln!("error: {e}");
+            return Ok(());
+        }
+    };
 
     crossterm::terminal::enable_raw_mode()?;
     crossterm::execute!(io::stdout(), EnterAlternateScreen)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
-    let mut app = App::new(cfg_path);
-    app.load_config();
+    let mut app = App::new(cfg, cli.config);
+    app.refresh_devices();
+
     let res = run_app(&mut terminal, &mut app);
 
     crossterm::terminal::disable_raw_mode()?;
