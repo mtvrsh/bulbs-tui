@@ -35,18 +35,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             },
         },
         None => {
-            crossterm::terminal::enable_raw_mode()?;
-            crossterm::execute!(io::stdout(), EnterAlternateScreen)?;
+            initialize_panic_handler();
+            setup_terminal()?;
             let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
             let mut app = App::new(cfg, args.config);
+            let res = run_app(&mut terminal, &mut app);
             app.refresh_devices();
 
-            let res = run_app(&mut terminal, &mut app);
-
-            crossterm::terminal::disable_raw_mode()?;
-            crossterm::execute!(terminal.backend_mut(), LeaveAlternateScreen,)?;
-            terminal.show_cursor()?;
+            restore_terminal()?;
 
             match res {
                 Ok(()) => {}
@@ -56,6 +53,26 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     Ok(())
+}
+
+fn setup_terminal() -> Result<(), Box<dyn Error>> {
+    crossterm::terminal::enable_raw_mode()?;
+    crossterm::execute!(io::stdout(), EnterAlternateScreen)?;
+    Ok(())
+}
+
+fn restore_terminal() -> Result<(), Box<dyn Error>> {
+    crossterm::execute!(io::stdout(), LeaveAlternateScreen,)?;
+    crossterm::terminal::disable_raw_mode()?;
+    Ok(())
+}
+
+fn initialize_panic_handler() {
+    let original_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        restore_terminal().expect("panic hook panicked");
+        original_hook(panic_info);
+    }));
 }
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<(), Box<dyn Error>> {
