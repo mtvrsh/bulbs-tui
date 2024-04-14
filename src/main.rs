@@ -5,6 +5,7 @@ mod config;
 mod ui;
 
 use app::CurrentlySetting;
+use cli::Subcmd;
 use crossterm::{
     event::{Event, KeyCode, KeyEventKind},
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
@@ -18,42 +19,42 @@ use std::{error::Error, io};
 use crate::app::{App, CurrentWidget, CurrentlyAdding};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let cli = cli::parse();
+    let args = cli::parse();
 
-    let cfg = config::load(cli.config.clone()).unwrap_or_default();
-    match cli.run(&mut cfg.clone()) {
-        Ok(v) => {
-            if let Some(v) = v.0 {
-                print!("{v}");
-            }
-            if !v.1 {
-                // if cli did something do not run tui
-                return Ok(());
+    let mut cfg = config::load(args.config.clone()).unwrap_or_default();
+
+    match &args.cmd {
+        Some(cmd) => match &cmd {
+            Subcmd::Cli(c) => match &c.run(&mut cfg) {
+                Ok(v) => {
+                    if let Some(s) = v {
+                        print!("{s}");
+                    }
+                }
+                Err(e) => eprintln!("error: {e}"),
+            },
+        },
+        None => {
+            crossterm::terminal::enable_raw_mode()?;
+            crossterm::execute!(io::stdout(), EnterAlternateScreen)?;
+            let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
+
+            let mut app = App::new(cfg, args.config);
+            app.refresh_devices();
+
+            let res = run_app(&mut terminal, &mut app);
+
+            crossterm::terminal::disable_raw_mode()?;
+            crossterm::execute!(terminal.backend_mut(), LeaveAlternateScreen,)?;
+            terminal.show_cursor()?;
+
+            match res {
+                Ok(()) => {}
+                Err(e) => eprintln!("error: {e}"),
             }
         }
-        Err(e) => {
-            eprintln!("error: {e}");
-            return Ok(());
-        }
-    };
-
-    crossterm::terminal::enable_raw_mode()?;
-    crossterm::execute!(io::stdout(), EnterAlternateScreen)?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
-    let mut app = App::new(cfg, cli.config);
-    app.refresh_devices();
-
-    let res = run_app(&mut terminal, &mut app);
-
-    crossterm::terminal::disable_raw_mode()?;
-    crossterm::execute!(terminal.backend_mut(), LeaveAlternateScreen,)?;
-    terminal.show_cursor()?;
-
-    match res {
-        Ok(()) => {}
-        Err(e) => eprintln!("{e}"),
     }
+
     Ok(())
 }
 

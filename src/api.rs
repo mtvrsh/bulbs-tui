@@ -10,7 +10,7 @@ pub struct Bulb {
     pub enabled: u8, // api uses int instead of bool
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Device {
     #[serde(flatten)]
     pub bulb: Bulb,

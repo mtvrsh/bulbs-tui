@@ -4,7 +4,7 @@ use ureq::Agent;
 
 use crate::api::Device;
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Config {
     #[serde(rename = "bulb")]
     pub bulbs: Vec<Device>,

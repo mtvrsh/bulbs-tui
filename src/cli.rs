@@ -1,12 +1,51 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use std::{error::Error, ffi::OsString, path::PathBuf, time::Duration};
 use ureq::AgentBuilder;
 
-use crate::api::Device;
-use crate::config::Config;
+use crate::{api::Device, config::Config};
 
-pub fn parse() -> Cli {
-    Cli::parse()
+pub fn parse() -> Args {
+    Args::parse()
+}
+
+#[derive(Debug, Parser)]
+#[command(about, version)]
+#[command(propagate_version = true)]
+pub struct Args {
+    /// Path to config file
+    #[arg(long,  default_value=xdg_cfg_path())]
+    pub config: PathBuf,
+
+    #[command(subcommand)]
+    pub cmd: Option<Subcmd>,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum Subcmd {
+    /// Control bulbs non interactively
+    Cli(Cli),
+}
+
+#[derive(clap::Args, Debug)]
+pub struct Cli {
+    /// Address of device to control (overrides devices defined in config file)
+    #[arg(short, value_name = "ADDR")]
+    addrs: Vec<String>,
+
+    /// Set brightness
+    #[arg(short, value_name = "NUM")]
+    brightness: Option<f32>,
+
+    /// Set color
+    #[arg(short)]
+    color: Option<String>,
+
+    /// Show device properties
+    #[arg(short)]
+    status: bool,
+
+    /// Set LED power
+    power: Option<PowerState>,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -16,37 +55,8 @@ pub enum PowerState {
     Toggle,
 }
 
-#[derive(Debug, Parser)]
-#[command(about, version)]
-#[allow(clippy::struct_excessive_bools)]
-pub struct Cli {
-    /// Path to config file
-    #[arg(long,  default_value=xdg_cfg_path())]
-    pub config: PathBuf,
-
-    /// Address of device to control (overrides devices defined in config file)
-    #[arg(short)]
-    pub addrs: Vec<String>,
-
-    /// Set brightness
-    #[arg(short, value_name = "NUM")]
-    pub brightness: Option<f32>,
-
-    /// Set color
-    #[arg(short)]
-    pub color: Option<String>,
-
-    /// Show device properties
-    #[arg(short)]
-    pub status: bool,
-
-    /// Set LED power
-    pub power: Option<PowerState>,
-}
-
 impl Cli {
-    pub fn run(&self, config: &mut Config) -> Result<(Option<String>, bool), Box<dyn Error>> {
-        let mut run_tui = true;
+    pub fn run(&self, config: &mut Config) -> Result<Option<String>, Box<dyn Error>> {
         let mut status: Option<String> = None;
         let agent = AgentBuilder::new()
             .timeout_connect(Duration::from_secs(1))
@@ -60,18 +70,21 @@ impl Cli {
             }
         }
 
+        if config.bulbs.is_empty() {
+            return Err(Box::new(CliError::NoDevicesError));
+        }
+
+        let mut sth_was_done = false;
         if let Some(brght) = self.brightness {
-            run_tui = false;
+            sth_was_done = true;
             config.set_brightness(&agent, brght)?;
-            // is ^ string useful for anything?
         }
         if let Some(color) = self.color.clone() {
-            run_tui = false;
+            sth_was_done = true;
             config.set_color(&agent, &color)?;
-            // same deal ^^
         }
         if let Some(power) = self.power.clone() {
-            run_tui = false;
+            sth_was_done = true;
             match power {
                 PowerState::On => config.on(&agent)?,
                 PowerState::Off => config.off(&agent)?,
@@ -82,16 +95,42 @@ impl Cli {
             }
         }
         if self.status {
-            run_tui = false;
+            sth_was_done = true;
             status = Some(config.status(&agent)?);
         }
 
-        Ok((status, run_tui))
+        if sth_was_done {
+            Ok(status)
+        } else {
+            Err(Box::new(CliError::NothingToDoError))
+        }
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum CliError {
+    NoDevicesError,
+    NothingToDoError,
+}
+
+impl std::fmt::Display for CliError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::NoDevicesError => {
+                write!(f, "no devices found, provide at least one device address")
+            }
+            Self::NothingToDoError => write!(
+                f,
+                "nothing to do, provide argument or option that does something"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for CliError {}
+
 fn xdg_cfg_path() -> OsString {
-    let xdg_dirs = xdg::BaseDirectories::with_prefix("bulbs").expect("Failed to get XDG dirs");
+    let xdg_dirs = xdg::BaseDirectories::with_prefix("bulbs").expect("failed to get XDG dirs");
     xdg_dirs
         .place_config_file("tui.toml")
         .unwrap_or_else(|_| "config.toml".into())
