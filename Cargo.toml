@@ -16,6 +16,7 @@ enum_glob_use = "warn"
 nursery = "warn"
 pedantic = "warn"
 unwrap_used = "warn"
+expect_used = "warn"
 
 [dependencies]
 anyhow = "1.0"

@@ -40,10 +40,8 @@ fn main() -> Result<()> {
 
             let mut app = App::new(cfg, args.config);
             let res = run_app(&mut terminal, &mut app);
-            app.refresh_devices();
 
             restore_terminal()?;
-
             return res;
         }
     }
@@ -66,12 +64,15 @@ fn restore_terminal() -> Result<()> {
 fn initialize_panic_handler() {
     let original_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |panic_info| {
+        #[allow(clippy::expect_used)]
         restore_terminal().expect("panic hook panicked");
         original_hook(panic_info);
     }));
 }
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> {
+    app.refresh_devices();
+
     loop {
         terminal.draw(|f| ui::ui(f, app))?;
 
@@ -83,9 +84,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> 
                 CurrentWidget::Devices => match key.code {
                     KeyCode::Esc | KeyCode::Char('q') => return app.save_and_quit(),
                     KeyCode::Enter => app.toggle_current(),
-                    KeyCode::Tab => {
-                        app.current_widget = CurrentWidget::Logs;
-                    }
+                    KeyCode::Tab => app.current_widget = CurrentWidget::Logs,
                     KeyCode::Up | KeyCode::Char('k') => app.prev_device(),
                     KeyCode::Down | KeyCode::Char('j') => app.next_device(),
                     KeyCode::Char('a') => {
@@ -103,9 +102,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> 
                 CurrentWidget::Logs => match key.code {
                     KeyCode::Esc | KeyCode::Char('q') => return app.save_and_quit(),
                     KeyCode::Backspace => app.logs.clear(),
-                    KeyCode::Tab => {
-                        app.current_widget = CurrentWidget::Devices;
-                    }
+                    KeyCode::Tab => app.current_widget = CurrentWidget::Devices,
                     KeyCode::Left | KeyCode::Char('h') => app.scroll_logs_left(),
                     KeyCode::Right | KeyCode::Char('l') => app.scroll_logs_right(),
                     _ => {}

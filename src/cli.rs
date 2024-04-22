@@ -130,6 +130,7 @@ impl std::fmt::Display for CliError {
 impl std::error::Error for CliError {}
 
 fn xdg_cfg_path() -> OsString {
+    #[allow(clippy::expect_used)]
     let xdg_dirs = xdg::BaseDirectories::with_prefix("bulbs").expect("failed to get XDG dirs");
     xdg_dirs
         .place_config_file("tui.toml")
