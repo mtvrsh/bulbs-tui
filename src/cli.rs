@@ -1,5 +1,6 @@
+use anyhow::Result;
 use clap::{Parser, Subcommand};
-use std::{error::Error, ffi::OsString, path::PathBuf, time::Duration};
+use std::{ffi::OsString, path::PathBuf, time::Duration};
 use ureq::AgentBuilder;
 
 use crate::{api::Device, config::Config};
@@ -10,7 +11,6 @@ pub fn parse() -> Args {
 
 #[derive(Debug, Parser)]
 #[command(about, version)]
-#[command(propagate_version = true)]
 pub struct Args {
     /// Path to config file
     #[arg(long,  default_value=xdg_cfg_path())]
@@ -28,7 +28,7 @@ pub enum Subcmd {
 
 #[derive(clap::Args, Debug)]
 pub struct Cli {
-    /// Address of device to control (overrides devices defined in config file)
+    /// Device address (overrides devices defined in config file)
     #[arg(short, value_name = "ADDR")]
     addrs: Vec<String>,
 
@@ -56,7 +56,7 @@ pub enum PowerState {
 }
 
 impl Cli {
-    pub fn run(&self, config: &mut Config) -> Result<Option<String>, Box<dyn Error>> {
+    pub fn run(&self, config: &mut Config) -> Result<Option<String>> {
         let mut status: Option<String> = None;
         let agent = AgentBuilder::new()
             .timeout_connect(Duration::from_secs(1))
@@ -71,7 +71,7 @@ impl Cli {
         }
 
         if config.bulbs.is_empty() {
-            return Err(Box::new(CliError::NoDevicesError));
+            return Err(CliError::NoDevicesError.into());
         }
 
         let mut sth_was_done = false;
@@ -102,7 +102,7 @@ impl Cli {
         if sth_was_done {
             Ok(status)
         } else {
-            Err(Box::new(CliError::NothingToDoError))
+            Err(CliError::NothingToDoError.into())
         }
     }
 }

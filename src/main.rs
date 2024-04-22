@@ -4,6 +4,7 @@ mod cli;
 mod config;
 mod ui;
 
+use anyhow::{Context, Result};
 use app::CurrentlySetting;
 use cli::Subcmd;
 use crossterm::{
@@ -14,25 +15,23 @@ use ratatui::{
     backend::{Backend, CrosstermBackend},
     Terminal,
 };
-use std::{error::Error, io};
+use std::io;
 
 use crate::app::{App, CurrentWidget, CurrentlyAdding};
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<()> {
     let args = cli::parse();
 
-    let mut cfg = config::load(args.config.clone()).unwrap_or_default();
+    let mut cfg = config::load(args.config.clone())
+        .with_context(|| format!("failed to read config: {}", args.config.to_string_lossy()))?;
 
     match &args.cmd {
         Some(cmd) => match &cmd {
-            Subcmd::Cli(c) => match &c.run(&mut cfg) {
-                Ok(v) => {
-                    if let Some(s) = v {
-                        print!("{s}");
-                    }
+            Subcmd::Cli(c) => {
+                if let Some(msg) = c.run(&mut cfg).with_context(|| "cli error".to_string())? {
+                    print!("{msg}");
                 }
-                Err(e) => eprintln!("error: {e}"),
-            },
+            }
         },
         None => {
             initialize_panic_handler();
@@ -45,23 +44,20 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             restore_terminal()?;
 
-            match res {
-                Ok(()) => {}
-                Err(e) => eprintln!("error: {e}"),
-            }
+            return res;
         }
     }
 
     Ok(())
 }
 
-fn setup_terminal() -> Result<(), Box<dyn Error>> {
+fn setup_terminal() -> Result<()> {
     crossterm::terminal::enable_raw_mode()?;
     crossterm::execute!(io::stdout(), EnterAlternateScreen)?;
     Ok(())
 }
 
-fn restore_terminal() -> Result<(), Box<dyn Error>> {
+fn restore_terminal() -> Result<()> {
     crossterm::execute!(io::stdout(), LeaveAlternateScreen,)?;
     crossterm::terminal::disable_raw_mode()?;
     Ok(())
@@ -75,7 +71,7 @@ fn initialize_panic_handler() {
     }));
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<(), Box<dyn Error>> {
+fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> {
     loop {
         terminal.draw(|f| ui::ui(f, app))?;
 

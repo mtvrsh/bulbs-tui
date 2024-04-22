@@ -1,5 +1,5 @@
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::error::Error;
 use ureq::Agent;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -31,7 +31,7 @@ impl Device {
         }
     }
 
-    pub fn update(&mut self, agent: &Agent) -> Result<String, Box<dyn Error>> {
+    pub fn update(&mut self, agent: &Agent) -> Result<String> {
         let resp = agent
             .get(format!("http://{}/led", self.ip).as_str())
             .call()?;
@@ -40,7 +40,7 @@ impl Device {
         Ok(s)
     }
 
-    pub fn on(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
+    pub fn on(&mut self, agent: &Agent) -> Result<()> {
         agent
             .put(format!("http://{}/led/on", self.ip).as_str())
             .call()?;
@@ -48,7 +48,7 @@ impl Device {
         Ok(())
     }
 
-    pub fn off(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
+    pub fn off(&mut self, agent: &Agent) -> Result<()> {
         agent
             .put(format!("http://{}/led/off", self.ip).as_str())
             .call()?
@@ -57,7 +57,7 @@ impl Device {
         Ok(())
     }
 
-    pub fn toggle(&mut self, agent: &Agent) -> Result<(), Box<dyn Error>> {
+    pub fn toggle(&mut self, agent: &Agent) -> Result<()> {
         if self.bulb.enabled == 1 {
             self.off(agent)
         } else {
@@ -65,7 +65,7 @@ impl Device {
         }
     }
 
-    pub fn set_color(&mut self, agent: &Agent, color: &str) -> Result<String, Box<dyn Error>> {
+    pub fn set_color(&mut self, agent: &Agent, color: &str) -> Result<String> {
         let s = agent
             .put(format!("http://{}/led/color/{}", self.ip, color).as_str())
             .call()?
@@ -74,11 +74,7 @@ impl Device {
         Ok(s)
     }
 
-    pub fn set_brightness(
-        &mut self,
-        agent: &Agent,
-        brightness: f32,
-    ) -> Result<String, Box<dyn Error>> {
+    pub fn set_brightness(&mut self, agent: &Agent, brightness: f32) -> Result<String> {
         let s = agent
             .put(format!("http://{}/led/brightness/{}", self.ip, brightness).as_str())
             .call()?

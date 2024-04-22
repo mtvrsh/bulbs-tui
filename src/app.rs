@@ -1,4 +1,5 @@
-use std::{error::Error, fs, path::PathBuf, time::Duration};
+use anyhow::{Context, Result};
+use std::{fs, path::PathBuf, time::Duration};
 use ureq::{Agent, AgentBuilder};
 
 use crate::api::Device;
@@ -112,10 +113,15 @@ impl App {
         self.log_horizontal_offset = self.log_horizontal_offset.saturating_add(4);
     }
 
-    pub fn save_and_quit(&mut self) -> Result<(), Box<dyn Error>> {
+    pub fn save_and_quit(&mut self) -> Result<()> {
         let devices = toml::to_string(&self.config)?;
-        Ok(fs::write(self.config_path.as_path(), devices)
-            .map_err(|e| format!("Failed to save config: {e}"))?)
+        fs::write(self.config_path.as_path(), devices).with_context(|| {
+            format!(
+                "failed to save config: {}",
+                self.config_path.to_string_lossy()
+            )
+        })?;
+        Ok(())
     }
 
     fn current_device(&mut self) -> &mut Device {
