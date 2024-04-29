@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use ureq::Agent;
 
@@ -17,8 +17,13 @@ pub struct Device {
     pub ip: String,
     #[serde(default)]
     pub name: String,
-    #[serde(skip_serializing, default = "tt")]
+    #[serde(skip_serializing, default = "always_true")]
     pub selected: bool,
+}
+
+// for serde default value = true
+const fn always_true() -> bool {
+    true
 }
 
 impl Device {
@@ -31,19 +36,20 @@ impl Device {
         }
     }
 
-    pub fn update(&mut self, agent: &Agent) -> Result<String> {
+    pub fn get_status(&mut self, agent: &Agent) -> Result<String> {
         let resp = agent
             .get(format!("http://{}/led", self.ip).as_str())
-            .call()?;
-        let s = resp.into_string()?;
-        self.bulb = serde_json::from_str(&s)?;
-        Ok(s)
+            .call()?
+            .into_string()?;
+        self.bulb = serde_json::from_str(&resp)?;
+        Ok(resp)
     }
 
     pub fn on(&mut self, agent: &Agent) -> Result<()> {
         agent
             .put(format!("http://{}/led/on", self.ip).as_str())
-            .call()?;
+            .call()
+            .map_err(read_body_into)?;
         self.bulb.enabled = 1;
         Ok(())
     }
@@ -51,8 +57,8 @@ impl Device {
     pub fn off(&mut self, agent: &Agent) -> Result<()> {
         agent
             .put(format!("http://{}/led/off", self.ip).as_str())
-            .call()?
-            .into_string()?;
+            .call()
+            .map_err(read_body_into)?;
         self.bulb.enabled = 0;
         Ok(())
     }
@@ -65,22 +71,22 @@ impl Device {
         }
     }
 
-    pub fn set_color(&mut self, agent: &Agent, color: &str) -> Result<String> {
-        let s = agent
+    pub fn set_color(&mut self, agent: &Agent, color: &str) -> Result<()> {
+        agent
             .put(format!("http://{}/led/color/{}", self.ip, color).as_str())
-            .call()?
-            .into_string()?;
+            .call()
+            .map_err(read_body_into)?;
         self.bulb.color = "#".to_owned() + color;
-        Ok(s)
+        Ok(())
     }
 
-    pub fn set_brightness(&mut self, agent: &Agent, brightness: f32) -> Result<String> {
-        let s = agent
+    pub fn set_brightness(&mut self, agent: &Agent, brightness: f32) -> Result<()> {
+        agent
             .put(format!("http://{}/led/brightness/{}", self.ip, brightness).as_str())
-            .call()?
-            .into_string()?;
+            .call()
+            .map_err(read_body_into)?;
         self.bulb.brightness = brightness;
-        Ok(s)
+        Ok(())
     }
 }
 
@@ -99,7 +105,86 @@ impl std::fmt::Display for Device {
     }
 }
 
-// for serde default value = true
-const fn tt() -> bool {
-    true
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct Devices {
+    #[serde(rename = "bulb")]
+    pub bulbs: Vec<Device>,
+}
+
+impl Devices {
+    pub fn get_status(&mut self, agent: &Agent) -> Result<String> {
+        let mut resp = String::new();
+        for i in 0..self.bulbs.len() {
+            if self.bulbs[i].selected {
+                resp.push_str(&self.bulbs[i].get_status(agent)?);
+            }
+        }
+        Ok(resp)
+    }
+
+    pub fn on(&mut self, agent: &Agent) -> Result<()> {
+        for i in 0..self.bulbs.len() {
+            if self.bulbs[i].selected {
+                self.bulbs[i].on(agent)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn off(&mut self, agent: &Agent) -> Result<()> {
+        for i in 0..self.bulbs.len() {
+            if self.bulbs[i].selected {
+                self.bulbs[i].off(agent)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn toggle(&mut self, agent: &Agent) -> Result<()> {
+        let mut first_is_enabled = 0;
+        for i in 0..self.bulbs.len() {
+            if self.bulbs[i].selected {
+                first_is_enabled = self.bulbs[i].bulb.enabled;
+                break;
+            }
+        }
+        if first_is_enabled == 1 {
+            self.off(agent)
+        } else {
+            self.on(agent)
+        }
+    }
+
+    pub fn set_color(&mut self, agent: &Agent, color: &str) -> Result<()> {
+        for i in 0..self.bulbs.len() {
+            if self.bulbs[i].selected {
+                self.bulbs[i].set_color(agent, color)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn set_brightness(&mut self, agent: &Agent, brightness: f32) -> Result<()> {
+        for i in 0..self.bulbs.len() {
+            if self.bulbs[i].selected {
+                self.bulbs[i].set_brightness(agent, brightness)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+// needed because donwcasting later is not possible and we want to display body on error
+fn read_body_into(error: ureq::Error) -> anyhow::Error {
+    match error {
+        ureq::Error::Status(code, response) => {
+            let url = response.get_url().to_string();
+            let body = match response.into_string() {
+                Ok(v) => v,
+                Err(e) => e.to_string(),
+            };
+            anyhow!("{url}: status code: {code}: {body}")
+        }
+        ureq::Error::Transport(_) => error.into(),
+    }
 }

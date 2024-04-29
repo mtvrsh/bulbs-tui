@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 use std::{ffi::OsString, path::PathBuf, time::Duration};
 use ureq::AgentBuilder;
 
-use crate::{api::Device, config::Config};
+use crate::{api::Device, api::Devices};
 
 pub fn parse() -> Args {
     Args::parse()
@@ -56,7 +56,7 @@ pub enum PowerState {
 }
 
 impl Cli {
-    pub fn run(&self, config: &mut Config) -> Result<Option<String>> {
+    pub fn run(&self, config: &mut Devices) -> Result<Option<String>> {
         let mut status: Option<String> = None;
         let agent = AgentBuilder::new()
             .timeout_connect(Duration::from_secs(1))
@@ -64,7 +64,7 @@ impl Cli {
             .build();
 
         if !self.addrs.is_empty() {
-            *config = Config::default();
+            *config = Devices::default();
             for a in &self.addrs {
                 config.bulbs.push(Device::new(a.into(), String::new()));
             }
@@ -89,14 +89,14 @@ impl Cli {
                 PowerState::On => config.on(&agent)?,
                 PowerState::Off => config.off(&agent)?,
                 PowerState::Toggle => {
-                    config.status(&agent)?;
+                    config.get_status(&agent)?;
                     config.toggle(&agent)?;
                 }
             }
         }
         if self.status {
             sth_was_done = true;
-            status = Some(config.status(&agent)?);
+            status = Some(config.get_status(&agent)?);
         }
 
         if sth_was_done {

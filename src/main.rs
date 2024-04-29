@@ -1,7 +1,6 @@
 mod api;
 mod app;
 mod cli;
-mod config;
 mod ui;
 
 use anyhow::{Context, Result};
@@ -22,13 +21,13 @@ use crate::app::{App, CurrentWidget, CurrentlyAdding};
 fn main() -> Result<()> {
     let args = cli::parse();
 
-    let mut cfg = config::load(args.config.clone())
+    let mut cfg = app::load_devices(args.config.clone())
         .with_context(|| format!("failed to read config: {}", args.config.to_string_lossy()))?;
 
     match &args.cmd {
         Some(cmd) => match &cmd {
             Subcmd::Cli(c) => {
-                if let Some(msg) = c.run(&mut cfg).with_context(|| "cli error".to_string())? {
+                if let Some(msg) = c.run(&mut cfg)? {
                     print!("{msg}");
                 }
             }
@@ -39,7 +38,7 @@ fn main() -> Result<()> {
             let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
             let mut app = App::new(cfg, args.config);
-            let res = run_app(&mut terminal, &mut app);
+            let res = run_tui(&mut terminal, &mut app);
 
             restore_terminal()?;
             return res;
@@ -70,7 +69,7 @@ fn initialize_panic_handler() {
     }));
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> {
+fn run_tui<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> {
     app.refresh_devices();
 
     loop {

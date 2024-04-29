@@ -1,9 +1,9 @@
 use anyhow::{Context, Result};
+use std::io;
 use std::{fs, path::PathBuf, time::Duration};
 use ureq::{Agent, AgentBuilder};
 
-use crate::api::Device;
-use crate::config::Config;
+use crate::api::{Device, Devices};
 
 pub enum CurrentWidget {
     Devices,
@@ -23,8 +23,8 @@ pub enum CurrentlySetting {
 }
 
 pub struct App {
-    pub agent: Agent,
-    pub config: Config,
+    agent: Agent,
+    pub devices: Devices,
     pub logs: Vec<String>,
     config_path: PathBuf,
 
@@ -47,13 +47,13 @@ macro_rules! log {
 }
 
 impl App {
-    pub fn new(config: Config, path: PathBuf) -> Self {
+    pub fn new(config: Devices, path: PathBuf) -> Self {
         Self {
             agent: AgentBuilder::new()
                 .timeout_connect(Duration::from_secs(1))
                 .timeout(Duration::from_secs(1))
                 .build(),
-            config,
+            devices: config,
             logs: Vec::default(),
             config_path: path,
 
@@ -98,7 +98,7 @@ impl App {
     }
 
     pub fn open_settings(&mut self) {
-        if let Some(first) = self.config.bulbs.iter().find(|d| d.selected) {
+        if let Some(first) = self.devices.bulbs.iter().find(|d| d.selected) {
             self.color_input = first.bulb.color.to_string();
             self.brightness_input = first.bulb.brightness.to_string();
             self.current_widget = CurrentWidget::DeviceSettings;
@@ -114,7 +114,7 @@ impl App {
     }
 
     pub fn save_and_quit(&mut self) -> Result<()> {
-        let devices = toml::to_string(&self.config)?;
+        let devices = toml::to_string(&self.devices)?;
         fs::write(self.config_path.as_path(), devices).with_context(|| {
             format!(
                 "failed to save config: {}",
@@ -125,7 +125,7 @@ impl App {
     }
 
     fn current_device(&mut self) -> &mut Device {
-        &mut self.config.bulbs[self.current_device_index]
+        &mut self.devices.bulbs[self.current_device_index]
     }
 
     pub fn prev_device(&mut self) {
@@ -133,46 +133,39 @@ impl App {
     }
 
     pub fn next_device(&mut self) {
-        if self.current_device_index < self.config.bulbs.len().saturating_sub(1) {
+        if self.current_device_index < self.devices.bulbs.len().saturating_sub(1) {
             self.current_device_index = self.current_device_index.saturating_add(1);
         }
     }
 
     pub fn select_device(&mut self) {
-        if !self.config.bulbs.is_empty() {
+        if !self.devices.bulbs.is_empty() {
             self.current_device().selected = !self.current_device().selected;
         }
     }
 
     pub fn remove_device(&mut self) {
-        if !self.config.bulbs.is_empty() {
-            self.config.bulbs.remove(self.current_device_index);
+        if !self.devices.bulbs.is_empty() {
+            self.devices.bulbs.remove(self.current_device_index);
             self.prev_device();
         }
     }
 
     pub fn add_device(&mut self) {
-        if self.config.bulbs.iter().any(|x| x.ip == self.ip_input) {
-            log!(
-                self,
-                format!("Device \"{}\" already present on list", self.ip_input)
-            );
+        if self.devices.bulbs.iter().any(|x| x.ip == self.ip_input) {
+            log!(self, format!("Device \"{}\" already added", self.ip_input));
             return;
         }
         if !self.ip_input.is_empty() {
             let mut bulb = Device::new(self.ip_input.clone(), self.name_input.clone());
-            match bulb.update(&self.agent) {
+            match bulb.get_status(&self.agent) {
                 Ok(v) => log!(self, v),
                 Err(e) => {
                     log!(self, e.to_string());
                     return;
                 }
             }
-            if let Err(e) = bulb.on(&self.agent) {
-                log!(self, e.to_string());
-                return;
-            }
-            self.config.bulbs.push(bulb);
+            self.devices.bulbs.push(bulb);
             self.ip_input.clear();
             self.name_input.clear();
         }
@@ -181,7 +174,10 @@ impl App {
     }
 
     pub fn refresh_devices(&mut self) {
-        match self.config.status(&self.agent) {
+        if self.devices.bulbs.is_empty() {
+            return;
+        }
+        match self.devices.get_status(&self.agent) {
             Ok(v) => log!(self, v),
             Err(e) => log!(self, e.to_string()),
         }
@@ -192,15 +188,15 @@ impl App {
     }
 
     pub fn toggle_selected(&mut self) {
-        match self.config.toggle(&self.agent) {
+        match self.devices.toggle(&self.agent) {
             Ok(()) => (),
             Err(e) => log!(self, e.to_string()),
         }
     }
 
     pub fn toggle_current(&mut self) {
-        if !self.config.bulbs.is_empty() {
-            match self.config.bulbs[self.current_device_index].toggle(&self.agent) {
+        if !self.devices.bulbs.is_empty() {
+            match self.devices.bulbs[self.current_device_index].toggle(&self.agent) {
                 Ok(()) => (),
                 Err(e) => log!(self, e.to_string()),
             }
@@ -211,7 +207,7 @@ impl App {
         if !self.color_input.is_empty() && self.color_input.len() == 7 {
             let color = self.color_input.as_str();
             if let Err(e) = self
-                .config
+                .devices
                 .set_color(&self.agent, color.strip_prefix('#').unwrap_or(color))
             {
                 log!(self, e.to_string());
@@ -225,8 +221,8 @@ impl App {
                 // compare floats with error margin, ty clippy
                 let error_margin = f32::EPSILON;
                 if (v - self.current_device().bulb.brightness).abs() > error_margin {
-                    match self.config.set_brightness(&self.agent, v) {
-                        Ok(_) => (),
+                    match self.devices.set_brightness(&self.agent, v) {
+                        Ok(()) => (),
                         Err(e) => log!(self, e.to_string()),
                     }
                     self.brightness_input.clear();
@@ -241,4 +237,17 @@ impl App {
         self.currently_setting = None;
         self.current_widget = CurrentWidget::Devices;
     }
+}
+
+pub fn load_devices(path: PathBuf) -> Result<Devices> {
+    let cfg = match fs::read_to_string(path) {
+        Ok(v) => v,
+        Err(e) => {
+            if e.kind() == io::ErrorKind::NotFound {
+                return Ok(Devices::default());
+            }
+            return Err(e.into());
+        }
+    };
+    toml::from_str(cfg.as_str()).map_err(std::convert::Into::into)
 }

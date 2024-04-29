@@ -19,7 +19,7 @@ unwrap_used = "warn"
 expect_used = "warn"
 
 [dependencies]
-anyhow = "1.0"
+anyhow = "1"
 clap = { version = "4.5.3", features = ["derive", "string"] }
 crossterm = "0.27.0"
 ratatui = "0.26.1"
