@@ -39,7 +39,8 @@ impl Device {
     pub fn get_status(&mut self, agent: &Agent) -> Result<String> {
         let resp = agent
             .get(format!("http://{}/led", self.ip).as_str())
-            .call()?
+            .call()
+            .map_err(with_body)?
             .into_string()?;
         self.bulb = serde_json::from_str(&resp)?;
         Ok(resp)
@@ -49,7 +50,7 @@ impl Device {
         agent
             .put(format!("http://{}/led/on", self.ip).as_str())
             .call()
-            .map_err(read_body_into)?;
+            .map_err(with_body)?;
         self.bulb.enabled = 1;
         Ok(())
     }
@@ -58,7 +59,7 @@ impl Device {
         agent
             .put(format!("http://{}/led/off", self.ip).as_str())
             .call()
-            .map_err(read_body_into)?;
+            .map_err(with_body)?;
         self.bulb.enabled = 0;
         Ok(())
     }
@@ -75,7 +76,7 @@ impl Device {
         agent
             .put(format!("http://{}/led/color/{}", self.ip, color).as_str())
             .call()
-            .map_err(read_body_into)?;
+            .map_err(with_body)?;
         self.bulb.color = "#".to_owned() + color;
         Ok(())
     }
@@ -84,7 +85,7 @@ impl Device {
         agent
             .put(format!("http://{}/led/brightness/{}", self.ip, brightness).as_str())
             .call()
-            .map_err(read_body_into)?;
+            .map_err(with_body)?;
         self.bulb.brightness = brightness;
         Ok(())
     }
@@ -174,8 +175,10 @@ impl Devices {
     }
 }
 
-// needed because donwcasting later is not possible and we want to display body on error
-fn read_body_into(error: ureq::Error) -> anyhow::Error {
+/// Converts `ureq::Error` to `anyhow::Error` but with added response body.
+/// Needed because donwcasting later is not possible and anyhow by default
+/// doesn't display body.
+fn with_body(error: ureq::Error) -> anyhow::Error {
     match error {
         ureq::Error::Status(code, response) => {
             let url = response.get_url().to_string();
