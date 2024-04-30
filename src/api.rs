@@ -43,7 +43,7 @@ impl Device {
             .map_err(with_body)?
             .into_string()?;
         self.bulb = serde_json::from_str(&resp)?;
-        Ok(resp)
+        Ok(format!("{}: {}", self.ip, resp))
     }
 
     pub fn on(&mut self, agent: &Agent) -> Result<()> {

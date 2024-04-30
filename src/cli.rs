@@ -28,7 +28,7 @@ pub enum Subcmd {
 
 #[derive(clap::Args, Debug)]
 pub struct Cli {
-    /// Device address (overrides devices defined in config file)
+    /// Device address (can be specified mulitiple times)
     #[arg(short, value_name = "ADDR")]
     addrs: Vec<String>,
 
@@ -40,7 +40,7 @@ pub struct Cli {
     #[arg(short)]
     color: Option<String>,
 
-    /// Show device properties
+    /// Show status
     #[arg(short)]
     status: bool,
 
