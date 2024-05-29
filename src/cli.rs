@@ -1,7 +1,6 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use std::{ffi::OsString, path::PathBuf, time::Duration};
-use ureq::AgentBuilder;
+use std::{ffi::OsString, path::PathBuf};
 
 use crate::api::{self, Device, Devices};
 
@@ -63,13 +62,9 @@ pub enum PowerState {
 impl Cli {
     pub fn run(&self, devices: &mut Devices) -> Result<Option<String>> {
         let mut status: Option<String> = None;
-        let agent = AgentBuilder::new()
-            .timeout_connect(Duration::from_secs(1))
-            .timeout(Duration::from_secs(1))
-            .build();
 
         if !self.addrs.is_empty() {
-            *devices = Devices::default();
+            *devices = Devices::new();
             for a in &self.addrs {
                 devices.bulbs.push(Device::new(a.into(), String::new()));
             }
@@ -89,26 +84,26 @@ impl Cli {
         let mut sth_was_done = false;
         if let Some(brght) = self.brightness {
             sth_was_done = true;
-            devices.set_brightness(&agent, brght)?;
+            devices.set_brightness(brght)?;
         }
         if let Some(color) = self.color.clone() {
             sth_was_done = true;
-            devices.set_color(&agent, &color)?;
+            devices.set_color(&color)?;
         }
         if let Some(power) = self.power.clone() {
             sth_was_done = true;
             match power {
-                PowerState::On => devices.on(&agent)?,
-                PowerState::Off => devices.off(&agent)?,
+                PowerState::On => devices.on()?,
+                PowerState::Off => devices.off()?,
                 PowerState::Toggle => {
-                    devices.get_status(&agent)?;
-                    devices.toggle(&agent)?;
+                    devices.get_status()?;
+                    devices.toggle()?;
                 }
             }
         }
         if self.status {
             sth_was_done = true;
-            status = Some(devices.get_status(&agent)?);
+            status = Some(devices.get_status()?);
         }
 
         if sth_was_done {

@@ -2,7 +2,7 @@ use std::{net::UdpSocket, time::Duration};
 
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use ureq::Agent;
+use ureq::{Agent, AgentBuilder};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Bulb {
@@ -108,42 +108,66 @@ impl std::fmt::Display for Device {
     }
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Devices {
+    #[serde(skip, default = "default_agent")]
+    agent: Agent,
+
     #[serde(rename = "bulb")]
     pub bulbs: Vec<Device>,
 }
 
+fn default_agent() -> Agent {
+    AgentBuilder::new()
+        .timeout_connect(Duration::from_secs(1))
+        .timeout(Duration::from_secs(1))
+        .build()
+}
+
 impl Devices {
-    pub fn get_status(&mut self, agent: &Agent) -> Result<String> {
+    pub fn new() -> Self {
+        Self {
+            agent: default_agent(),
+            bulbs: Vec::default(),
+        }
+    }
+
+    pub fn add(&mut self, ip: String, name: String) -> Result<String> {
+        let mut bulb = Device::new(ip, name);
+        let resp = bulb.get_status(&self.agent)?;
+        self.bulbs.push(bulb);
+        Ok(resp)
+    }
+
+    pub fn get_status(&mut self) -> Result<String> {
         let mut resp = String::new();
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
-                resp.push_str(&self.bulbs[i].get_status(agent)?);
+                resp.push_str(&self.bulbs[i].get_status(&self.agent)?);
             }
         }
         Ok(resp)
     }
 
-    pub fn on(&mut self, agent: &Agent) -> Result<()> {
+    pub fn on(&mut self) -> Result<()> {
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
-                self.bulbs[i].on(agent)?;
+                self.bulbs[i].on(&self.agent)?;
             }
         }
         Ok(())
     }
 
-    pub fn off(&mut self, agent: &Agent) -> Result<()> {
+    pub fn off(&mut self) -> Result<()> {
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
-                self.bulbs[i].off(agent)?;
+                self.bulbs[i].off(&self.agent)?;
             }
         }
         Ok(())
     }
 
-    pub fn toggle(&mut self, agent: &Agent) -> Result<()> {
+    pub fn toggle(&mut self) -> Result<()> {
         let mut first_is_enabled = 0;
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
@@ -152,25 +176,29 @@ impl Devices {
             }
         }
         if first_is_enabled == 1 {
-            self.off(agent)
+            self.off()
         } else {
-            self.on(agent)
+            self.on()
         }
     }
 
-    pub fn set_color(&mut self, agent: &Agent, color: &str) -> Result<()> {
+    pub fn toggle_one(&mut self, index: usize) -> Result<()> {
+        self.bulbs[index].toggle(&self.agent)
+    }
+
+    pub fn set_color(&mut self, color: &str) -> Result<()> {
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
-                self.bulbs[i].set_color(agent, color)?;
+                self.bulbs[i].set_color(&self.agent, color)?;
             }
         }
         Ok(())
     }
 
-    pub fn set_brightness(&mut self, agent: &Agent, brightness: f32) -> Result<()> {
+    pub fn set_brightness(&mut self, brightness: f32) -> Result<()> {
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
-                self.bulbs[i].set_brightness(agent, brightness)?;
+                self.bulbs[i].set_brightness(&self.agent, brightness)?;
             }
         }
         Ok(())

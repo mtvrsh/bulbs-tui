@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
 use std::io;
-use std::{fs, path::PathBuf, time::Duration};
-use ureq::{Agent, AgentBuilder};
+use std::{fs, path::PathBuf};
 
 use crate::api::{self, Device, Devices};
 
@@ -23,7 +22,6 @@ pub enum CurrentlySetting {
 }
 
 pub struct App {
-    agent: Agent,
     pub devices: Devices,
     pub logs: Vec<String>,
     config_path: PathBuf,
@@ -49,10 +47,6 @@ macro_rules! log {
 impl App {
     pub fn new(config: Devices, path: PathBuf) -> Self {
         Self {
-            agent: AgentBuilder::new()
-                .timeout_connect(Duration::from_secs(1))
-                .timeout(Duration::from_secs(1))
-                .build(),
             devices: config,
             logs: Vec::default(),
             config_path: path,
@@ -157,15 +151,16 @@ impl App {
             return;
         }
         if !self.ip_input.is_empty() {
-            let mut bulb = Device::new(self.ip_input.clone(), self.name_input.clone());
-            match bulb.get_status(&self.agent) {
+            match self
+                .devices
+                .add(self.ip_input.clone(), self.name_input.clone())
+            {
                 Ok(v) => log!(self, v),
                 Err(e) => {
                     log!(self, e.to_string());
                     return;
                 }
             }
-            self.devices.bulbs.push(bulb);
             self.ip_input.clear();
             self.name_input.clear();
         }
@@ -177,7 +172,7 @@ impl App {
         if self.devices.bulbs.is_empty() {
             return;
         }
-        match self.devices.get_status(&self.agent) {
+        match self.devices.get_status() {
             Ok(v) => log!(self, v),
             Err(e) => log!(self, e.to_string()),
         }
@@ -188,15 +183,13 @@ impl App {
             Ok(v) => {
                 for ip in v {
                     if !self.devices.bulbs.iter().any(|x| x.ip == ip) {
-                        let mut bulb = Device::new(ip, String::new());
-                        match bulb.get_status(&self.agent) {
+                        match self.devices.add(ip, String::new()) {
                             Ok(v) => log!(self, v),
                             Err(e) => {
                                 log!(self, e.to_string());
                                 return;
                             }
                         }
-                        self.devices.bulbs.push(bulb);
                     }
                 }
             }
@@ -205,7 +198,7 @@ impl App {
     }
 
     pub fn toggle_selected(&mut self) {
-        match self.devices.toggle(&self.agent) {
+        match self.devices.toggle() {
             Ok(()) => (),
             Err(e) => log!(self, e.to_string()),
         }
@@ -213,9 +206,8 @@ impl App {
 
     pub fn toggle_current(&mut self) {
         if !self.devices.bulbs.is_empty() {
-            match self.devices.bulbs[self.current_device_index].toggle(&self.agent) {
-                Ok(()) => (),
-                Err(e) => log!(self, e.to_string()),
+            if let Err(e) = self.devices.toggle_one(self.current_device_index) {
+                log!(self, e.to_string());
             }
         }
     }
@@ -225,7 +217,7 @@ impl App {
             let color = self.color_input.as_str();
             if let Err(e) = self
                 .devices
-                .set_color(&self.agent, color.strip_prefix('#').unwrap_or(color))
+                .set_color(color.strip_prefix('#').unwrap_or(color))
             {
                 log!(self, e.to_string());
             }
@@ -238,7 +230,7 @@ impl App {
                 // compare floats with error margin, ty clippy
                 let error_margin = f32::EPSILON;
                 if (v - self.current_device().bulb.brightness).abs() > error_margin {
-                    match self.devices.set_brightness(&self.agent, v) {
+                    match self.devices.set_brightness(v) {
                         Ok(()) => (),
                         Err(e) => log!(self, e.to_string()),
                     }
@@ -261,7 +253,7 @@ pub fn load_devices(path: PathBuf) -> Result<Devices> {
         Ok(v) => v,
         Err(e) => {
             if e.kind() == io::ErrorKind::NotFound {
-                return Ok(Devices::default());
+                return Ok(Devices::new());
             }
             return Err(e.into());
         }
