@@ -1,3 +1,5 @@
+use std::{net::UdpSocket, time::Duration};
+
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use ureq::Agent;
@@ -189,5 +191,34 @@ fn with_body(error: ureq::Error) -> anyhow::Error {
             anyhow!("{url}: status code: {code}: {body}")
         }
         ureq::Error::Transport(_) => error.into(),
+    }
+}
+
+pub fn discover_bulbs(timeout: u64) -> Result<Vec<String>> {
+    const BULBS_PING: &[u8; 16] = b"bulbsclientping0";
+    const BULBS_PONG: &[u8; 16] = b"bulbsserverpong0";
+
+    let socket = UdpSocket::bind("0.0.0.0:0")?;
+    socket.set_write_timeout(Some(Duration::from_millis(timeout)))?;
+    socket.set_read_timeout(Some(Duration::from_millis(timeout)))?;
+    socket.set_broadcast(true)?;
+    socket.send_to(BULBS_PING, "255.255.255.255:5001")?;
+
+    let mut buf = [0; 16];
+    let mut devices = Vec::<String>::new();
+    loop {
+        match socket.recv_from(&mut buf) {
+            Ok((_, addr)) => {
+                if buf == *BULBS_PONG {
+                    devices.push(addr.ip().to_string());
+                }
+            }
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::WouldBlock {
+                    return Ok(devices);
+                }
+                return Err(e.into());
+            }
+        }
     }
 }

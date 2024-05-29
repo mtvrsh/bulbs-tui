@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 use std::{ffi::OsString, path::PathBuf, time::Duration};
 use ureq::AgentBuilder;
 
-use crate::{api::Device, api::Devices};
+use crate::api::{self, Device, Devices};
 
 pub fn parse() -> Args {
     Args::parse()
@@ -38,6 +38,11 @@ pub struct Cli {
 
     /// Set color
     #[arg(short)]
+
+    /// Automatically find devices
+    #[arg(short)]
+    discover: bool,
+
     color: Option<String>,
 
     /// Show status
@@ -56,7 +61,7 @@ pub enum PowerState {
 }
 
 impl Cli {
-    pub fn run(&self, config: &mut Devices) -> Result<Option<String>> {
+    pub fn run(&self, devices: &mut Devices) -> Result<Option<String>> {
         let mut status: Option<String> = None;
         let agent = AgentBuilder::new()
             .timeout_connect(Duration::from_secs(1))
@@ -64,39 +69,46 @@ impl Cli {
             .build();
 
         if !self.addrs.is_empty() {
-            *config = Devices::default();
+            *devices = Devices::default();
             for a in &self.addrs {
-                config.bulbs.push(Device::new(a.into(), String::new()));
+                devices.bulbs.push(Device::new(a.into(), String::new()));
             }
         }
 
-        if config.bulbs.is_empty() {
+        if self.discover {
+            let discovered_devices = api::discover_bulbs(200)?;
+            for a in discovered_devices {
+                devices.bulbs.push(Device::new(a, String::new()));
+            }
+        }
+
+        if devices.bulbs.is_empty() {
             return Err(CliError::NoDevicesError.into());
         }
 
         let mut sth_was_done = false;
         if let Some(brght) = self.brightness {
             sth_was_done = true;
-            config.set_brightness(&agent, brght)?;
+            devices.set_brightness(&agent, brght)?;
         }
         if let Some(color) = self.color.clone() {
             sth_was_done = true;
-            config.set_color(&agent, &color)?;
+            devices.set_color(&agent, &color)?;
         }
         if let Some(power) = self.power.clone() {
             sth_was_done = true;
             match power {
-                PowerState::On => config.on(&agent)?,
-                PowerState::Off => config.off(&agent)?,
+                PowerState::On => devices.on(&agent)?,
+                PowerState::Off => devices.off(&agent)?,
                 PowerState::Toggle => {
-                    config.get_status(&agent)?;
-                    config.toggle(&agent)?;
+                    devices.get_status(&agent)?;
+                    devices.toggle(&agent)?;
                 }
             }
         }
         if self.status {
             sth_was_done = true;
-            status = Some(config.get_status(&agent)?);
+            status = Some(devices.get_status(&agent)?);
         }
 
         if sth_was_done {

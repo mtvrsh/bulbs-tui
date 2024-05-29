@@ -3,7 +3,7 @@ use std::io;
 use std::{fs, path::PathBuf, time::Duration};
 use ureq::{Agent, AgentBuilder};
 
-use crate::api::{Device, Devices};
+use crate::api::{self, Device, Devices};
 
 pub enum CurrentWidget {
     Devices,
@@ -184,7 +184,24 @@ impl App {
     }
 
     pub fn discover(&mut self) {
-        log!(self, "not implemented".to_string());
+        match api::discover_bulbs(200) {
+            Ok(v) => {
+                for ip in v {
+                    if !self.devices.bulbs.iter().any(|x| x.ip == ip) {
+                        let mut bulb = Device::new(ip, String::new());
+                        match bulb.get_status(&self.agent) {
+                            Ok(v) => log!(self, v),
+                            Err(e) => {
+                                log!(self, e.to_string());
+                                return;
+                            }
+                        }
+                        self.devices.bulbs.push(bulb);
+                    }
+                }
+            }
+            Err(e) => log!(self, e.to_string()),
+        }
     }
 
     pub fn toggle_selected(&mut self) {
