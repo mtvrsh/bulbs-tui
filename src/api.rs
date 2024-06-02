@@ -232,7 +232,7 @@ pub fn discover_bulbs(timeout: u64) -> Result<Vec<String>> {
     socket.set_broadcast(true)?;
     socket.send_to(BULBS_PING, "255.255.255.255:5001")?;
 
-    let mut buf = [0; 16];
+    let mut buf = [0; BULBS_PONG.len()];
     let mut devices = Vec::<String>::new();
     loop {
         match socket.recv_from(&mut buf) {

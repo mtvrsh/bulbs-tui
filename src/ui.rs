@@ -14,6 +14,7 @@ pub fn ui(f: &mut Frame, app: &App) {
             Constraint::Length(1),
             Constraint::Min(app.devices.bulbs.len() as u16 + 2),
             Constraint::Length(app.logs.len() as u16 + 2),
+            Constraint::Length(1),
         ])
         .split(f.size());
 
@@ -24,42 +25,42 @@ pub fn ui(f: &mut Frame, app: &App) {
     match &app.current_widget {
         CurrentWidget::Devices => {
             help = Line::from(vec![
-                "[a]".blue().bold(),
-                ":add device ".white(),
-                "[A]".blue().bold(),
-                ":autodetect ".white(),
-                "<c>".blue().bold(),
-                ":change color ".white(),
-                "[d]".blue().bold(),
-                ":remove ".white(),
-                "<e>".blue().bold(),
-                ":ON/OFF ".white(),
-                "<r>".blue().bold(),
-                ":refresh ".white(),
+                " Add device: ".white(),
+                "a".blue().bold(),
+                " | Autodetect: ".white(),
+                "A".blue().bold(),
+                " | Change color: ".white(),
+                "c".blue().bold(),
+                " | Remove: ".white(),
+                "d".blue().bold(),
+                " | ON/OFF: ".white(),
+                "e".blue().bold(),
+                " | Refresh: ".white(),
+                "r".blue().bold(),
+                " | ON/OFF (one): ".white(),
                 "<enter>".blue().bold(),
-                ":ON/OFF (one) ".white(),
+                " | Select: ".white(),
                 "<space>".blue().bold(),
-                ":select ".white(),
-                "<q>".blue().bold(),
-                ":quit".white(),
+                " | Quit: ".white(),
+                "q".blue().bold(),
             ]);
             devices_block = devices_block.border_style(Style::new().light_blue());
         }
         CurrentWidget::Logs => {
             log_block = log_block.border_style(Style::new().light_blue());
             help = Line::from(vec![
+                " Clear: ".white(),
                 "<backspace>".blue().bold(),
-                ":clear ".white(),
-                "<q>".blue().bold(),
-                ":quit".white(),
+                " | Quit: ".white(),
+                "q".blue().bold(),
             ]);
         }
         CurrentWidget::DeviceSettings | CurrentWidget::AddDevice => {
             help = Line::from(vec![
+                " Apply: ".white(),
                 "<enter>".blue().bold(),
-                ":apply ".white(),
+                " | Cancel: ".white(),
                 "<esc>".blue().bold(),
-                ":cancel".white(),
             ]);
         }
     }
@@ -96,13 +97,14 @@ pub fn ui(f: &mut Frame, app: &App) {
     };
 
     let logs = Paragraph::new(ll.join("\n"))
-        .block(log_block.title("Logs").title_bottom(help))
+        .block(log_block.title("Logs"))
         .scroll((scroll.saturating_sub(2), app.log_horizontal_offset));
 
     let header = Paragraph::new("bulbs-tui").alignment(Alignment::Center);
     f.render_widget(header, chunks[0]);
     f.render_widget(devices, chunks[1]);
     f.render_widget(logs, chunks[2]);
+    f.render_widget(help, chunks[3]);
 
     match &app.current_widget {
         CurrentWidget::Devices | CurrentWidget::Logs => (),
