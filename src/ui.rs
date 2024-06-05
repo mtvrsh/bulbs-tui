@@ -167,10 +167,18 @@ fn render_device_settings(f: &mut Frame, app: &App) {
         let mut brightness_block = Block::default().title("Brightness").borders(Borders::ALL);
 
         let active_style = Style::default().bg(Color::Blue).fg(Color::Black);
+        let mut color_preview: Color;
         match setting {
-            CurrentlySetting::Color => color_block = color_block.style(active_style),
-            CurrentlySetting::Brightness => brightness_block = brightness_block.style(active_style),
+            CurrentlySetting::Color => {
+                color_block = color_block.style(active_style);
+                color_preview = Color::Blue;
+            }
+            CurrentlySetting::Brightness => {
+                brightness_block = brightness_block.style(active_style);
+                color_preview = Color::Black;
+            }
         };
+        color_preview = app.color_input.parse().unwrap_or(color_preview);
 
         f.render_widget(Clear, popup_chunks[0]);
         f.render_widget(Clear, popup_chunks[1]);
@@ -181,8 +189,7 @@ fn render_device_settings(f: &mut Frame, app: &App) {
         let brightness_text = Paragraph::new(app.brightness_input.clone()).block(brightness_block);
         f.render_widget(brightness_text, popup_chunks[1]);
 
-        let color: Color = app.color_input.parse().unwrap_or(Color::Blue);
-        f.render_widget(Block::new().bg(color), color_indicator_chunk);
+        f.render_widget(Block::new().bg(color_preview), color_indicator_chunk);
     }
 }
 

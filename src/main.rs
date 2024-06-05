@@ -81,7 +81,7 @@ fn run_tui<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> 
             }
             match app.current_widget {
                 CurrentWidget::Devices => match key.code {
-                    KeyCode::Esc | KeyCode::Char('q') => return app.save_and_quit(),
+                    KeyCode::Esc | KeyCode::Char('q') => return app.write_config(),
                     KeyCode::Enter => app.toggle_current(),
                     KeyCode::Tab => app.current_widget = CurrentWidget::Logs,
                     KeyCode::Up | KeyCode::Char('k') => app.prev_device(),
@@ -99,7 +99,7 @@ fn run_tui<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> 
                     _ => {}
                 },
                 CurrentWidget::Logs => match key.code {
-                    KeyCode::Esc | KeyCode::Char('q') => return app.save_and_quit(),
+                    KeyCode::Esc | KeyCode::Char('q') => return app.write_config(),
                     KeyCode::Backspace => app.logs.clear(),
                     KeyCode::Tab => app.current_widget = CurrentWidget::Devices,
                     KeyCode::Left | KeyCode::Char('h') => app.scroll_logs_left(),

@@ -35,13 +35,12 @@ pub struct Cli {
     #[arg(short, value_name = "NUM")]
     brightness: Option<f32>,
 
-    /// Set color
-    #[arg(short)]
-
     /// Automatically find devices
     #[arg(short)]
     discover: bool,
 
+    /// Set color
+    #[arg(short)]
     color: Option<String>,
 
     /// Show status
@@ -103,7 +102,7 @@ impl Cli {
         }
         if self.status {
             sth_was_done = true;
-            status = Some(devices.get_status()?);
+            status = devices.get_status()?;
         }
 
         if sth_was_done {

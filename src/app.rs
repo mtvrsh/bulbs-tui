@@ -81,7 +81,6 @@ impl App {
                 CurrentlySetting::Color => {
                     self.currently_setting = Some(CurrentlySetting::Brightness);
                 }
-
                 CurrentlySetting::Brightness => {
                     self.currently_setting = Some(CurrentlySetting::Color);
                 }
@@ -107,11 +106,11 @@ impl App {
         self.log_horizontal_offset = self.log_horizontal_offset.saturating_add(4);
     }
 
-    pub fn save_and_quit(&mut self) -> Result<()> {
+    pub fn write_config(&mut self) -> Result<()> {
         let devices = toml::to_string(&self.devices)?;
         fs::write(self.config_path.as_path(), devices).with_context(|| {
             format!(
-                "failed to save config: {}",
+                "failed to write config: {}",
                 self.config_path.to_string_lossy()
             )
         })?;
@@ -173,7 +172,8 @@ impl App {
             return;
         }
         match self.devices.get_status() {
-            Ok(v) => log!(self, v),
+            Ok(None) => (),
+            Ok(Some(v)) => log!(self, v),
             Err(e) => log!(self, e.to_string()),
         }
     }
@@ -181,6 +181,9 @@ impl App {
     pub fn discover(&mut self) {
         match api::discover_bulbs(200) {
             Ok(v) => {
+                if v.is_empty() {
+                    log!(self, "No devices detected".to_string());
+                }
                 for ip in v {
                     if !self.devices.bulbs.iter().any(|x| x.ip == ip) {
                         match self.devices.add(ip, String::new()) {
@@ -214,14 +217,13 @@ impl App {
 
     pub fn set_color_and_brightness(&mut self) {
         if !self.color_input.is_empty() && self.color_input.len() == 7 {
-            let color = self.color_input.as_str();
-            if let Err(e) = self
-                .devices
-                .set_color(color.strip_prefix('#').unwrap_or(color))
-            {
+            if let Err(e) = self.devices.set_color(&self.color_input) {
                 log!(self, e.to_string());
+                return;
             }
-            self.color_input = "#".to_string();
+        } else {
+            log!(self, format!("failed to set color: wrong input lenght"));
+            return;
         }
 
         let brightness = self.brightness_input.parse::<f32>();
@@ -230,15 +232,13 @@ impl App {
                 // compare floats with error margin, ty clippy
                 let error_margin = f32::EPSILON;
                 if (v - self.current_device().bulb.brightness).abs() > error_margin {
-                    match self.devices.set_brightness(v) {
-                        Ok(()) => (),
-                        Err(e) => log!(self, e.to_string()),
+                    if let Err(e) = self.devices.set_brightness(v) {
+                        log!(self, e.to_string());
                     }
-                    self.brightness_input.clear();
                 }
             }
             Err(e) => {
-                log!(self, e.to_string());
+                log!(self, format!("failed to set brightness: {e}"));
                 return;
             }
         }

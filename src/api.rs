@@ -75,6 +75,7 @@ impl Device {
     }
 
     pub fn set_color(&mut self, agent: &Agent, color: &str) -> Result<()> {
+        let color = color.strip_prefix('#').unwrap_or(color);
         agent
             .put(format!("http://{}/led/color/{}", self.ip, color).as_str())
             .call()
@@ -139,14 +140,18 @@ impl Devices {
         Ok(resp)
     }
 
-    pub fn get_status(&mut self) -> Result<String> {
+    pub fn get_status(&mut self) -> Result<Option<String>> {
         let mut resp = String::new();
         for i in 0..self.bulbs.len() {
             if self.bulbs[i].selected {
                 resp.push_str(&self.bulbs[i].get_status(&self.agent)?);
             }
         }
-        Ok(resp)
+
+        if resp.is_empty() {
+            return Ok(None);
+        }
+        Ok(Some(resp))
     }
 
     pub fn on(&mut self) -> Result<()> {
@@ -216,7 +221,10 @@ fn with_body(error: ureq::Error) -> anyhow::Error {
                 Ok(v) => v,
                 Err(e) => e.to_string(),
             };
-            anyhow!("{url}: status code: {code}: {body}")
+            anyhow!(
+                "{url}: status code: {code}: {}",
+                body.strip_suffix('\n').unwrap_or(&body)
+            )
         }
         ureq::Error::Transport(_) => error.into(),
     }
