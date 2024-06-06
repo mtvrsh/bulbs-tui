@@ -6,9 +6,13 @@ use ureq::{Agent, AgentBuilder};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Bulb {
+    #[serde(default = "default_brightness")]
     pub brightness: f32, // range: 0..1
+
+    #[serde(default = "default_color")]
     pub color: String,
-    #[serde(alias = "on")]
+
+    #[serde(default, alias = "on")]
     pub enabled: u8, // api uses int instead of bool
 }
 
@@ -16,16 +20,26 @@ pub struct Bulb {
 pub struct Device {
     #[serde(flatten)]
     pub bulb: Bulb,
+
     pub ip: String,
-    #[serde(default)]
+
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub name: String,
-    #[serde(skip_serializing, default = "always_true")]
+
+    #[serde(default = "always_true")]
     pub selected: bool,
 }
 
-// for serde default value = true
 const fn always_true() -> bool {
     true
+}
+
+const fn default_brightness() -> f32 {
+    1.0
+}
+
+fn default_color() -> String {
+    String::from("#FFFFFF")
 }
 
 impl Device {
